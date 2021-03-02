@@ -15,8 +15,8 @@ login = config.get('id', 'login')
 password = config.get('id', 'password')
 valid_chat = config.get('id', 'valid_chat')
 valid_chat2 = config.get('id', 'valid_chat2')
-
-save_dir = 'pld/'
+save_dir = config.get('vars', 'save_dir')
+user_agent_val = config.get('vars', 'user_agent_val')
 
 request_num = {}
 request_str = {}
@@ -24,15 +24,13 @@ request = {}
 
 bot = telebot.TeleBot(bot_id)
 
-user_agent_val = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.190 Safari/537.36'
-
 url = {
-    'root_url' : 'http://wiki-jur.inetvl.corp',
-    'ref_url_ref' : 'http://wiki-jur.inetvl.corp/doku.php',
-    'cookie' : 'DokuWiki',
-    'host' : 'wiki-jur.inetvl.corp',
-    'auth_page' : 'http://wiki-jur.inetvl.corp/doku.php?id=start&do=login&sectok=',
-    'search_url' : 'http://wiki-jur.inetvl.corp/doku.php?do=search&id='
+    'root_url' : config.get('url', 'root_url'),
+    'ref_url_ref' : config.get('url', 'ref_url_ref'),
+    'cookie' : config.get('url', 'cookie'),
+    'host' : config.get('url', 'host'),
+    'auth_page' : config.get('url', 'auth_page'),
+    'search_url' : config.get('url', 'search_url')
 }
 
 def extract_arg(arg):
@@ -119,7 +117,7 @@ def pld(message):
                         for var in soup.findAll('a', class_="media mediafile mf_pdf"):
                             _n = var["title"]
                             _h = var['href']
-                            _n = '.pdf'.join(_n.split('.pdf')[:-1]) + '.pdf'
+                            _n = ('.pdf'.join(_n.split('.pdf')[:-1]) + '.pdf').replace('_', ' ').replace('corp', '').replace('pld', '').replace('_', ' ')
                             f = open(save_dir + _n, "wb")
                             r = s.get(url.get('root_url') + _h, headers = {'User-Agent': user_agent_val})
                             print(r)
@@ -179,7 +177,7 @@ def pld(message):
                     for var in soup.findAll('a', class_="media mediafile mf_pdf"):
                         _n = var["title"]
                         _h = var['href']
-                        _n = '.pdf'.join(_n.split('.pdf')[:-1]) + '.pdf'
+                        _n = ('.pdf'.join(_n.split('.pdf')[:-1]) + '.pdf').replace('_', ' ').replace('corp', '').replace('pld', '')
                         f = open(save_dir + _n, "wb")
                         r = s.get(url.get('root_url') + _h, headers = {'User-Agent': user_agent_val})
                         print(r)
