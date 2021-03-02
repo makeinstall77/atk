@@ -119,6 +119,7 @@ def pld(message):
                         for var in soup.findAll('a', class_="media mediafile mf_pdf"):
                             _n = var["title"]
                             _h = var['href']
+                            _n = '.pdf'.join(_n.split('.pdf')[:-1]) + '.pdf'
                             f = open(save_dir + _n, "wb")
                             r = s.get(url.get('root_url') + _h, headers = {'User-Agent': user_agent_val})
                             print(r)
@@ -178,6 +179,7 @@ def pld(message):
                     for var in soup.findAll('a', class_="media mediafile mf_pdf"):
                         _n = var["title"]
                         _h = var['href']
+                        _n = '.pdf'.join(_n.split('.pdf')[:-1]) + '.pdf'
                         f = open(save_dir + _n, "wb")
                         r = s.get(url.get('root_url') + _h, headers = {'User-Agent': user_agent_val})
                         print(r)
