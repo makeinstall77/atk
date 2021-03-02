@@ -4,6 +4,8 @@ from configparser import ConfigParser
 from bs4 import BeautifulSoup
 import requests
 import telebot
+import sys
+import os
 
 #config init
 config = ConfigParser()
@@ -12,6 +14,9 @@ bot_id = config.get('id', 'bot')
 login = config.get('id', 'login')
 password = config.get('id', 'password')
 valid_chat = config.get('id', 'valid_chat')
+valid_chat2 = config.get('id', 'valid_chat2')
+
+save_dir = 'pld/'
 
 request_num = {}
 request_str = {}
@@ -35,7 +40,7 @@ def extract_arg(arg):
     
 def get_command(arg):
     return arg.split(' ', 1)[0]
-
+    
 @bot.message_handler(content_types=['text'])
 def pld(message):
     global request_num
@@ -48,7 +53,7 @@ def pld(message):
     except:
         pass
     try:
-        if (str(_chat_id) == str(valid_chat)):
+        if (str(_chat_id) == str(valid_chat) or str(_chat_id) == str(valid_chat2)):
             if (_command == 'плд'):
                 #bot.reply_to(message, "Ищу плд по имени: " + _args)
                 
@@ -106,18 +111,21 @@ def pld(message):
                     c = r.content
                     soup = BeautifulSoup(c,'lxml')
                     
-                    for var in soup.findAll('a', class_="media mediafile mf_pdf"):
-                        #var['title'] = var['href']
-                        if var.string is not None:
-                            f = open('pld/' + var.string, "wb") #открываем файл для записи, в режиме wb
-                            r = s.get(url.get('root_url') + var['href'], headers = {'User-Agent': user_agent_val}) #делаем запрос
+                    print("soup: " + url.get('root_url') + src)
+                    
+                    if (not soup.findAll('a', class_="media mediafile mf_pdf")):
+                        bot.send_message(_chat_id, "Нет файлов")
+                    else:
+                        for var in soup.findAll('a', class_="media mediafile mf_pdf"):
+                            _n = var["title"]
+                            _h = var['href']
+                            f = open(save_dir + _n, "wb")
+                            r = s.get(url.get('root_url') + _h, headers = {'User-Agent': user_agent_val})
                             print(r)
-                            f.write(r.content) #записываем содержимое в файл; как видите - content запроса
+                            f.write(r.content)
                             f.close()
-                            doc = open('pld/' + var.string, 'rb')
+                            doc = open(save_dir + _n, 'rb')
                             bot.send_document(_chat_id, doc)
-                        else:
-                            bot.send_message(_chat_id, "Нет файлов")
                         
                     request = {_chat_id : False}
                 elif (num > 1):
@@ -162,19 +170,22 @@ def pld(message):
                 c = r.content
                 soup = BeautifulSoup(c,'lxml')
                 
-                for var in soup.findAll('a', class_="media mediafile mf_pdf"):
-                    #var['title'] = var['href']
-                    if var.string is not None:
-                        f = open('pld/' + var.string, "wb") #открываем файл для записи, в режиме wb
-                        r = s.get(url.get('root_url') + var['href'], headers = {'User-Agent': user_agent_val}) #делаем запрос
+                print("soup: " + url.get('root_url') + src)
+                
+                if (not soup.findAll('a', class_="media mediafile mf_pdf")):
+                    bot.send_message(_chat_id, "Нет файлов")
+                else:
+                    for var in soup.findAll('a', class_="media mediafile mf_pdf"):
+                        _n = var["title"]
+                        _h = var['href']
+                        f = open(save_dir + _n, "wb")
+                        r = s.get(url.get('root_url') + _h, headers = {'User-Agent': user_agent_val})
                         print(r)
-                        f.write(r.content) #записываем содержимое в файл; как видите - content запроса
+                        f.write(r.content)
                         f.close()
-                        doc = open('pld/' + var.string, 'rb')
+                        doc = open(save_dir + _n, 'rb')
                         bot.send_document(_chat_id, doc)
-                    else:
-                        bot.send_message(_chat_id, "Нет файлов")
-                    
+                
                 request = {_chat_id : False}
                 
             else:
@@ -182,9 +193,10 @@ def pld(message):
         else:
             print (_chat_id)
     except Exception as e:
+            print (e)
             exc_type, exc_obj, exc_tb = sys.exc_info()
             fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-            logging.error(exc_type, fname, exc_tb.tb_lineno)
+            #logging.error(exc_type, fname, exc_tb.tb_lineno)
             bot.reply_to(message, e)
             pass
         
