@@ -291,7 +291,7 @@ def pld(message):
                                         sname = key[key.index(i)+1]
                                 num += 1
                                 #n = ('/'.join(key[-1].split('/')[-1:]))
-                                n = sname
+                                n = sname + ".pdf"
                                 write_scheme(save_dir + n, key[-1])
                                 files.append(save_dir + n)
                                 print (key)
