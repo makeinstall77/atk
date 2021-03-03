@@ -101,7 +101,26 @@ def free_ports(ip):
     comm_cur.execute("select p.number from net.ports p left outer join UTM5.ip_groups g on p.commutator_id = g.switch_id and p.number = g.port_id where p.commutator_id = " + str(comm_id)+" and p.type = 'empty' and g.account_id is null and p.number < 24 and (p.comment = '' or p.comment is null) order by p.number")
     return comm_cur.fetchall()
     
-def get_street_id(street, house):
+# def get_street_id(street, house):
+    # bazadb = bazadb_connect()
+    # cur = bazadb.cursor(buffered=True)
+    # _sql = """select b.id from buildings b join streets s on s.id = b.street_id 
+                # where s.name = %s 
+                # and b.number = %s;"""
+    # cur.execute(_sql, (street, house))
+    # res = cur.fetchone()
+    # if res is not None:
+        # street_id = res[0]
+        # _sql = """select s.name, b.number, i.title, i.type, CONCAT('https://atk.is/schemes/', i.building_id, '/', i.date_upd, '.', i.fext) as link 
+                    # from buildings b join building_image i on b.id = i.building_id join streets s on s.id = b.street_id 
+                    # where b.id = %s;"""
+        # cur.execute(_sql, (street_id,))
+        # res = cur.fetchall()
+    # else:
+        # res = ''
+    # return res
+    
+def get_link(street, house):
     bazadb = bazadb_connect()
     cur = bazadb.cursor(buffered=True)
     _sql = """select b.id from buildings b join streets s on s.id = b.street_id 
@@ -111,7 +130,26 @@ def get_street_id(street, house):
     res = cur.fetchone()
     if res is not None:
         street_id = res[0]
-        _sql = """select s.name, b.number, i.title, i.type, CONCAT('https://atk.is/schemes/', i.building_id, '/', i.date_upd, '.', i.fext) as link 
+        _sql = """select CONCAT('https://atk.is/schemes/', i.building_id, '/', i.date_upd, '.', i.fext) as link 
+                    from buildings b join building_image i on b.id = i.building_id join streets s on s.id = b.street_id 
+                    where b.id = %s;"""
+        cur.execute(_sql, (street_id,))
+        res = cur.fetchall()
+    else:
+        res = ''
+    return res
+    
+def get_schemes_name(street, house):
+    bazadb = bazadb_connect()
+    cur = bazadb.cursor(buffered=True)
+    _sql = """select b.id from buildings b join streets s on s.id = b.street_id 
+                where s.name = %s 
+                and b.number = %s;"""
+    cur.execute(_sql, (street, house))
+    res = cur.fetchone()
+    if res is not None:
+        street_id = res[0]
+        _sql = """select i.title 
                     from buildings b join building_image i on b.id = i.building_id join streets s on s.id = b.street_id 
                     where b.id = %s;"""
         cur.execute(_sql, (street_id,))
@@ -263,40 +301,34 @@ def pld(message):
                     house = ' '.join(args.split(' ')[-1:])
                     street = ' '.join(args.split(' ')[:-1])
                                        
-                    msg = get_street_id(street, house)
+                    #msg = get_street_id(street, house)
+                    name = get_schemes_name(street, house)
+                    link = get_link(street, house)
                     
-                    if msg == '':
+                    _name = []
+                    _link = []
+                    
+                    for key in range(len(name)):
+                        _name.append(str(name[key]).replace('\'','')[1:-2])
+
+                    for key in range(len(link)):
+                        _link.append(str(link[key]).replace('\'','')[1:-2])
+
+                    _sum = [list(tup) for tup in zip(_name, _link)]
+                    
+                    if name == '':
                         msg = "Неправильный адрес"
                         bot.reply_to(message, msg)
                     else:
-                        schemes = msg
-                        msg = ""
-                        _l = []
-                        for key in range(len(schemes)):
-                            _s = str(schemes[key]).replace('\'','')
-                            _s = _s[1:-1].replace(',', '')
-                            _g = _s.split()
-                            _l.append(_g)
                         
-                        num = 0
                         files = []
-                        
-                        print(_l)
-                        
-                        
-                        for key in _l:
-                            if (key[-1][len(key[-1])-3:]) != 'vsd':
-                                for i in key:
-                                    if (i.isdigit()):
-                                        sname = key[key.index(i)+1]
-                                num += 1
-                                #n = ('/'.join(key[-1].split('/')[-1:]))
-                                n = sname + ".pdf"
-                                write_scheme(save_dir + n, key[-1])
+ 
+                        for key in _sum:
+                            if (key[1][-3:]) != 'vsd':
+                                n = key[0] + '.pdf'
+                                write_scheme(save_dir + n, key[1])
                                 files.append(save_dir + n)
                                 print (key)
-
-                                
                                 
                         if (len(files) == 0):
                             bot.reply_to(message, "Нет файлов")
@@ -304,10 +336,9 @@ def pld(message):
                             count = len(files) // 10
                             bot.reply_to(message, "Файлов нашлось: " + str(len(files)))
                         
-                        for x in range(count + 1):
-                            bot.send_media_group(chat_id, [telebot.types.InputMediaDocument(open(doc, 'rb')) for doc in files[x*10:x*10+10]])
-                            time.sleep(wait_time)
-                            
+                            for x in range(count + 1):
+                                bot.send_media_group(chat_id, [telebot.types.InputMediaDocument(open(doc, 'rb')) for doc in files[x*10:x*10+10]])
+                                time.sleep(wait_time)
                     
                 except Exception as e:
                     print (e)
@@ -355,6 +386,28 @@ def pld(message):
                 msg = 'UNAUTORIZED ACCESS ATTEMP from '+str(chat_id)
                 logging.warning(msg)
                 
+        elif ((command == 'тест') and (args != "")):
+            if check_command_allow(chat_id, command):
+                try:
+                    house = ' '.join(args.split(' ')[-1:])
+                    street = ' '.join(args.split(' ')[:-1])
+                                       
+                    name = get_link(street, house)
+                    
+                    for key in range(len(name)):
+                        print(str(name[key]).replace('\'','')[1:-2])
+                    
+                    print(str(name))
+                    
+
+                    
+                except Exception as e:
+                    print (e)
+                    exc_type, exc_obj, exc_tb = sys.exc_info()
+                    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+                    logging.error(exc_type, fname, exc_tb.tb_lineno)
+                    pass
+                
         elif (command.isdigit() and request.get(chat_id) and (int(command)-1 <= request_num.get(chat_id)) and (int(command)-1 >= 0)):
             request = {chat_id : False}
             request_drs = {chat_id : False}
@@ -374,17 +427,6 @@ def pld(message):
                     bot.send_media_group(chat_id, [telebot.types.InputMediaDocument(open(doc, 'rb')) for doc in files[x*10:x*10+10]])
                     time.sleep(wait_time)
                         
-        # elif (command.isdigit() and request_drs.get(chat_id) and int(command)-1 >=0 and int(command)-1 < len(links.get(chat_id))):
-            # num = int(command)-1
-            # request_drs = {chat_id : False}
-            # request = {chat_id : False}
-            # link = links.get(chat_id)[num]
-            # n = ('/'.join(link.split('/')[-1:]))
-
-            # write_scheme(save_dir + n,link)
-            
-            # doc = open(save_dir + n, 'rb')
-            # bot.send_document(chat_id, doc)
             
         else:
             pass
