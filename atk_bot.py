@@ -120,6 +120,32 @@ def free_ports(ip):
         # res = ''
     # return res
     
+def get_drs(street, house):
+    bazadb = bazadb_connect()
+    cur = bazadb.cursor(buffered=True)
+    _sql = """select b.id from buildings b join streets s on s.id = b.street_id 
+                where s.name = %s 
+                and b.number = %s;"""
+    cur.execute(_sql, (street, house))
+    res = cur.fetchone()
+    if res is not None:
+        street_id = res[0]
+        _sql = """select CONCAT('https://atk.is/schemes/', i.building_id, '/', i.date_upd, '.', i.fext) as link 
+                    from buildings b join building_image i on b.id = i.building_id join streets s on s.id = b.street_id 
+                    where b.id = %s and i.type = 'drs';"""
+        cur.execute(_sql, (street_id,))
+        res1 = cur.fetchall()
+         
+        _sql = """select i.title
+                    from buildings b join building_image i on b.id = i.building_id join streets s on s.id = b.street_id 
+                    where b.id = %s and i.type = 'drs';"""
+        cur.execute(_sql, (street_id,))
+        res2 = cur.fetchall()
+    else:
+        res1 = ''
+        res2 = ''
+    return res1, res2
+    
 def get_link(street, house):
     bazadb = bazadb_connect()
     cur = bazadb.cursor(buffered=True)
@@ -325,7 +351,7 @@ def pld(message):
  
                         for key in _sum:
                             if (key[1][-3:]) != 'vsd':
-                                n = key[0] + '.pdf'
+                                n = key[0] + key[1][-4:]
                                 write_scheme(save_dir + n, key[1])
                                 files.append(save_dir + n)
                                 print (key)
@@ -386,19 +412,52 @@ def pld(message):
                 msg = 'UNAUTORIZED ACCESS ATTEMP from '+str(chat_id)
                 logging.warning(msg)
                 
-        elif ((command == 'тест') and (args != "")):
+        elif ((command == 'дрс') and (args != "")):
             if check_command_allow(chat_id, command):
                 try:
                     house = ' '.join(args.split(' ')[-1:])
                     street = ' '.join(args.split(' ')[:-1])
                                        
-                    name = get_link(street, house)
+                    link, name = get_drs(street, house)
+                    
+                    _name = []
+                    _link = []
                     
                     for key in range(len(name)):
-                        print(str(name[key]).replace('\'','')[1:-2])
+                        _name.append(str(name[key]).replace('\'','')[1:-2])
+
+                    for key in range(len(link)):
+                        _link.append(str(link[key]).replace('\'','')[1:-2])
                     
-                    print(str(name))
+                    _sum = [list(tup) for tup in zip(_name, _link)]
                     
+                    print(str(_sum))
+                    
+                    if name == '':
+                        msg = "Неправильный адрес"
+                        bot.reply_to(message, msg)
+                    else:
+                        
+                        files = []
+ 
+                        for key in _sum:
+                            if (key[1][-3:]) != 'vsd':
+                                n = key[0] + key[1][-4:]
+                                print(n)
+                                print(key[1])
+                                write_scheme(save_dir + n, key[1])
+                                files.append(save_dir + n)
+                                print (key)
+                                
+                        if (len(files) == 0):
+                            bot.reply_to(message, "Нет файлов")
+                        else:
+                            count = len(files) // 10
+                            bot.reply_to(message, "Файлов нашлось: " + str(len(files)))
+                        
+                            for x in range(count + 1):
+                                bot.send_media_group(chat_id, [telebot.types.InputMediaDocument(open(doc, 'rb')) for doc in files[x*10:x*10+10]])
+                                time.sleep(wait_time)
 
                     
                 except Exception as e:
