@@ -8,6 +8,7 @@ import sys
 import os
 import logging
 import time
+import mysql.connector
 #import streets
 
 #config init
@@ -45,10 +46,42 @@ url = {
     'search_url' : config.get('url', 'search_url')
 }
 
+netdb_vars = {
+    'host' : config.get('mysql_netdb', 'host'),
+    'user' : config.get('mysql_netdb', 'login'),
+    'password' : config.get('mysql_netdb', 'password'),
+    'database' : config.get('mysql_netdb', 'database')
+}
+
 #global vars
 request_num = {}
 request_str = {}
 request = {}
+
+def check_comm_aviability(ip):
+    netdb = mysql.connector.connect(
+    host = netdb_vars.get('host'),
+    user = netdb_vars.get('user'),
+    password = netdb_vars.get('password'),
+    database = netdb_vars.get('database')
+    )
+    #Получаем id коммутатора
+    comm_cur = netdb.cursor()
+    comm_cur.execute("select id from commutators where ip = '" + ip + "'")
+    comm_res = comm_cur.fetchall()
+    return len(comm_res)
+
+
+def check_IPV4(ip):
+    def isIPv4(s):
+        try: return str(int(s)) == s and 0 <= int(s) <= 255
+        except: return False
+    if ip.count(".") == 3 and all(isIPv4(i) for i in ip.split(".")):
+        return ip
+    elif ip.count(".") == 1 and all(isIPv4(i) for i in ip.split(".")):
+        return "10.254." + ip
+    else:
+        return ""
 
 def extract_arg(arg):
     return arg.split(maxsplit=1)[1:]
@@ -126,7 +159,32 @@ def pld(message):
         
     try:
         if (str(_chat_id) == str(valid_chat) or str(_chat_id) == str(valid_chat2)):
-            if ((_command == 'плд') and (_args != "")):
+            #FREE PORT
+            if ((_command == 'порт') and (_args != "")):
+                if (check_IPV4(message.text.split(' ')[1])!= "") :
+                    _ip = check_IPV4(message.text.split(' ')[1])
+                    if check_comm_aviability(_ip) > 0 :
+                        msg = "Свободные порты на коммутаторе " + _ip + ":\n"
+                        netdb = mysql.connector.connect(
+                        host = netdb_vars.get('host'),
+                        user = netdb_vars.get('user'),
+                        password = netdb_vars.get('password'),
+                        database = netdb_vars.get('database')
+                        )
+                        comm_cur = netdb.cursor()
+                        comm_cur = netdb.cursor()
+                        comm_cur.execute("select id from commutators where ip = '" + _ip + "'")
+                        comm_res = comm_cur.fetchone()
+                        comm_id = comm_res[0]
+                        comm_cur.execute("select p.number from net.ports p left outer join UTM5.ip_groups g on p.commutator_id = g.switch_id and p.number = g.port_id where p.commutator_id = " + str(comm_id)+" and p.type = 'empty' and g.account_id is null and p.number < 24 and (p.comment = '' or p.comment is null) order by p.number")
+                        port_res = comm_cur.fetchall()
+                        for port in port_res :
+                            msg = msg + str(port[0]) + ", "
+                        bot.reply_to(message, msg)
+                    else :
+                        bot.reply_to(message, "Коммутатор " + _ip + " недоступен или не существует")
+            #WIKI SEARCH
+            elif ((_command == 'плд') and (_args != "")):
             
                 msg = 'pld search: "' + 'плд ' + _args + '" from: ' + str(_chat_id)
                 logging.warning(msg)
