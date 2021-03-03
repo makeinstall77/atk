@@ -17,11 +17,10 @@ config.read('config.ini')
 bot_id = config.get('id', 'bot')
 login = config.get('id', 'login')
 password = config.get('id', 'password')
-valid_chat = config.get('id', 'valid_chat')
-valid_chat2 = config.get('id', 'valid_chat2')
 save_dir = config.get('vars', 'save_dir')
 user_agent_val = config.get('vars', 'user_agent_val')
 wait_time = int(config.get('vars', 'wait_time'))
+access_list = dict(config.items('access_list'))
 
 #setup logging
 logging.basicConfig(filename=os.path.basename(sys.argv[0])+'.log', level=logging.INFO)
@@ -58,19 +57,37 @@ request_num = {}
 request_str = {}
 request = {}
 
-def check_comm_aviability(ip):
+def netdb_connect():
     netdb = mysql.connector.connect(
     host = netdb_vars.get('host'),
     user = netdb_vars.get('user'),
     password = netdb_vars.get('password'),
     database = netdb_vars.get('database')
     )
+    return netdb
+
+def check_comm_aviability(ip):
+    netdb = netdb_connect()
     #Получаем id коммутатора
     comm_cur = netdb.cursor()
     comm_cur.execute("select id from commutators where ip = '" + ip + "'")
     comm_res = comm_cur.fetchall()
     return len(comm_res)
+    
+def free_ports(_ip):
+    netdb = netdb_connect()
+    comm_cur = netdb.cursor()
+    comm_cur.execute("select id from commutators where ip = '" + _ip + "'")
+    comm_res = comm_cur.fetchone()
+    comm_id = comm_res[0]
+    comm_cur.execute("select p.number from net.ports p left outer join UTM5.ip_groups g on p.commutator_id = g.switch_id and p.number = g.port_id where p.commutator_id = " + str(comm_id)+" and p.type = 'empty' and g.account_id is null and p.number < 24 and (p.comment = '' or p.comment is null) order by p.number")
+    return comm_cur.fetchall()
 
+def check_command_allow(_chat_id, _command):
+    for key in access_list: 
+        access = access_list.get(key).split()
+        if (str(_chat_id) == key) and _command in access:
+            return True
 
 def check_IPV4(ip):
     def isIPv4(s):
@@ -158,33 +175,25 @@ def pld(message):
         pass
         
     try:
-        if (str(_chat_id) == str(valid_chat) or str(_chat_id) == str(valid_chat2)):
-            #FREE PORT
-            if ((_command == 'порт') and (_args != "")):
+        #FREE PORT
+        if ((_command == 'порт') and (_args != "")):
+            if check_command_allow(_chat_id, _command):
                 if (check_IPV4(message.text.split(' ')[1])!= "") :
                     _ip = check_IPV4(message.text.split(' ')[1])
                     if check_comm_aviability(_ip) > 0 :
                         msg = "Свободные порты на коммутаторе " + _ip + ":\n"
-                        netdb = mysql.connector.connect(
-                        host = netdb_vars.get('host'),
-                        user = netdb_vars.get('user'),
-                        password = netdb_vars.get('password'),
-                        database = netdb_vars.get('database')
-                        )
-                        comm_cur = netdb.cursor()
-                        comm_cur = netdb.cursor()
-                        comm_cur.execute("select id from commutators where ip = '" + _ip + "'")
-                        comm_res = comm_cur.fetchone()
-                        comm_id = comm_res[0]
-                        comm_cur.execute("select p.number from net.ports p left outer join UTM5.ip_groups g on p.commutator_id = g.switch_id and p.number = g.port_id where p.commutator_id = " + str(comm_id)+" and p.type = 'empty' and g.account_id is null and p.number < 24 and (p.comment = '' or p.comment is null) order by p.number")
-                        port_res = comm_cur.fetchall()
+                        port_res = free_ports(_ip)
                         for port in port_res :
                             msg = msg + str(port[0]) + ", "
-                        bot.reply_to(message, msg)
+                        bot.reply_to(message, msg[:-2])
                     else :
                         bot.reply_to(message, "Коммутатор " + _ip + " недоступен или не существует")
-            #WIKI SEARCH
-            elif ((_command == 'плд') and (_args != "")):
+            else:
+                msg = 'UNAUTORIZED ACCESS ATTEMP from '+str(_chat_id)
+                logging.warning(msg)
+        #WIKI SEARCH
+        elif ((_command == 'плд') and (_args != "")):
+            if check_command_allow(_chat_id, _command):
             
                 msg = 'pld search: "' + 'плд ' + _args + '" from: ' + str(_chat_id)
                 logging.warning(msg)
@@ -234,8 +243,11 @@ def pld(message):
                     request_num = {_chat_id : num}
                 else:
                     bot.send_message(_chat_id, msg)
+            else:
+                msg = 'UNAUTORIZED ACCESS ATTEMP from '+str(_chat_id)
+                logging.warning(msg)
                 
-            elif (_command.isdigit() and request.get(_chat_id) and (int(_command)-1 <= request_num.get(_chat_id)) and (int(_command)-1 >= 0)):
+        elif (_command.isdigit() and request.get(_chat_id) and (int(_command)-1 <= request_num.get(_chat_id)) and (int(_command)-1 >= 0)):
                 request = {_chat_id : False}
                 keys = list(request_str.get(_chat_id).keys())
                 src = request_str.get(_chat_id).get(keys[int(_command)-1])
@@ -252,12 +264,8 @@ def pld(message):
                     for x in range(_count + 1):
                         bot.send_media_group(_chat_id, [telebot.types.InputMediaDocument(open(doc, 'rb')) for doc in _files[x*10:x*10+10]])
                         time.sleep(wait_time)
-                
-            else:
-                pass
         else:
-            msg = 'UNAUTORIZED ACCESS ATTEMP from '+str(_chat_id)
-            logging.warning(msg)
+            pass
             
     except Exception as e:
         print (e)
