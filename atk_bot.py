@@ -52,41 +52,78 @@ netdb_vars = {
     'database' : config.get('mysql_netdb', 'database')
 }
 
+bazadb_vars = {
+    'host' : config.get('mysql_baza', 'host'),
+    'user' : config.get('mysql_baza', 'login'),
+    'password' : config.get('mysql_baza', 'password'),
+    'database' : config.get('mysql_baza', 'database')
+}
+
 #global vars
 request_num = {}
 request_str = {}
 request = {}
+# request_drs = {}
+# links = {}
 
 def netdb_connect():
     netdb = mysql.connector.connect(
-    host = netdb_vars.get('host'),
-    user = netdb_vars.get('user'),
-    password = netdb_vars.get('password'),
-    database = netdb_vars.get('database')
-    )
+        host = netdb_vars.get('host'),
+        user = netdb_vars.get('user'),
+        password = netdb_vars.get('password'),
+        database = netdb_vars.get('database')
+        )
     return netdb
+    
+def bazadb_connect():
+    bazadb = mysql.connector.connect(
+        host = bazadb_vars.get('host'),
+        user = bazadb_vars.get('user'),
+        password = bazadb_vars.get('password'),
+        database = bazadb_vars.get('database')
+        )
+    return bazadb
 
 def check_comm_aviability(ip):
     netdb = netdb_connect()
     #Получаем id коммутатора
-    comm_cur = netdb.cursor()
+    comm_cur = netdb.cursor(buffered=True)
     comm_cur.execute("select id from commutators where ip = '" + ip + "'")
     comm_res = comm_cur.fetchall()
     return len(comm_res)
     
-def free_ports(_ip):
+def free_ports(ip):
     netdb = netdb_connect()
     comm_cur = netdb.cursor()
-    comm_cur.execute("select id from commutators where ip = '" + _ip + "'")
+    comm_cur.execute("select id from commutators where ip = '" + ip + "'")
     comm_res = comm_cur.fetchone()
     comm_id = comm_res[0]
     comm_cur.execute("select p.number from net.ports p left outer join UTM5.ip_groups g on p.commutator_id = g.switch_id and p.number = g.port_id where p.commutator_id = " + str(comm_id)+" and p.type = 'empty' and g.account_id is null and p.number < 24 and (p.comment = '' or p.comment is null) order by p.number")
     return comm_cur.fetchall()
+    
+def get_street_id(street, house):
+    bazadb = bazadb_connect()
+    cur = bazadb.cursor(buffered=True)
+    _sql = """select b.id from buildings b join streets s on s.id = b.street_id 
+                where s.name = %s 
+                and b.number = %s;"""
+    cur.execute(_sql, (street, house))
+    res = cur.fetchone()
+    if res is not None:
+        street_id = res[0]
+        _sql = """select s.name, b.number, i.title, i.type, CONCAT('https://atk.is/schemes/', i.building_id, '/', i.date_upd, '.', i.fext) as link 
+                    from buildings b join building_image i on b.id = i.building_id join streets s on s.id = b.street_id 
+                    where b.id = %s;"""
+        cur.execute(_sql, (street_id,))
+        res = cur.fetchall()
+    else:
+        res = ''
+    return res
 
-def check_command_allow(_chat_id, _command):
+def check_command_allow(chat_id, command):
     for key in access_list: 
         access = access_list.get(key).split()
-        if (str(_chat_id) == key) and _command in access:
+        if (str(chat_id) == key) and command in access:
             return True
 
 def check_IPV4(ip):
@@ -107,13 +144,13 @@ def get_command(arg):
     return arg.split(' ', 1)[0]
     
 def start_session():
-    _s = requests.Session()
-    _r = _s.get(url.get('root_url'), headers = {'User-Agent': user_agent_val})
-    _cookie = _s.cookies.get(url.get('cookie'), domain=url.get('host'))
-    _s.headers.update({'Referer':url.get('ref_url_ref')})
-    _s.headers.update({'User-Agent':user_agent_val})
-    _r = _s.get(url.get('auth_page'), headers = {'User-Agent': user_agent_val})
-    _p = _s.post(url.get('auth_page'), {
+    s = requests.Session()
+    r = s.get(url.get('root_url'), headers = {'User-Agent': user_agent_val})
+    cookie = s.cookies.get(url.get('cookie'), domain=url.get('host'))
+    s.headers.update({'Referer':url.get('ref_url_ref')})
+    s.headers.update({'User-Agent':user_agent_val})
+    r = s.get(url.get('auth_page'), headers = {'User-Agent': user_agent_val})
+    p = s.post(url.get('auth_page'), {
     'sectok' : '', 
     'id' : 'start',
     'do' : 'login',
@@ -121,149 +158,234 @@ def start_session():
     'p' : password,
     'r' : 1
     })
-    return _s
+    return s
     
-def search_pages(_arg):
-    _s = start_session()
-    _r = _s.get(url.get('search_url') + _arg, headers = {'User-Agent': user_agent_val})
-    _c = _r.content
-    return _c
+def search_pages(arg):
+    s = start_session()
+    r = s.get(url.get('search_url') + arg, headers = {'User-Agent': user_agent_val})
+    c = r.content
     
-def search_files(_src):
-    _s = _s = start_session()
-    _r = _s.get(url.get('root_url') + _src, headers = {'User-Agent': user_agent_val})
-    _c = _r.content
+    soup = BeautifulSoup(c,'lxml')
+    svars = {}
     
-    return _c
+    for var in soup.findAll('a', class_="wikilink1"):
+        svars[var['title']] = var['href']
+        
+    num = 0
+    msg = ""
+    for key in svars:
+        num += 1
+        msg += "➡️ " + str(num) + " " + key.replace('corp:pld:', '').replace('_', ' ').replace('corp:','').replace('pld1:', '').replace('it:', '').replace('tp:', '') + "\n"
     
-def get_file(_url):
-    _s = start_session()
-    _r = _s.get(url.get('root_url') + _url, headers = {'User-Agent': user_agent_val})
-    return _r
+    if (len(msg) > 1023):
+        msg = msg[:1023]
+        msg = '➡️'.join(msg.split('➡️')[:-1])
+        msg = "Нашлось совпадений: " + str(num) + "\nПревышена максимальная длина сообщения!\n\n" + msg
+    else:
+        msg =  "Нашлось совпадений: " + str(num) + "\n\n" + msg
+                
+    return msg, num, svars
     
-def write_file(_n, _h):
-    f = open(_n, "wb")
-    r = get_file(_h)
+def search_files(arg):
+    s = s = start_session()
+    r = s.get(url.get('root_url') + arg, headers = {'User-Agent': user_agent_val})
+    c = r.content
+    return c
+    
+def get_file(arg):
+    s = start_session()
+    r = s.get(url.get('root_url') + arg, headers = {'User-Agent': user_agent_val})
+    return r
+    
+def write_file(n, h):
+    f = open(n, "wb")
+    r = get_file(h)
     f.write(r.content)
     f.close()
     
-def parse_pdf(_c):
-    _files = []
-    soup = BeautifulSoup(_c,'lxml')
+def write_scheme(n, h):
+    s = requests.Session()
+    r = s.get('https://atk.is/', headers = {'User-Agent': user_agent_val})
+    f = open(n, "wb")
+    r = s.get(h, headers = {'User-Agent': user_agent_val})
+    f.write(r.content)
+    f.close()
+    
+def parse_pdf(arg):
+    files = []
+    soup = BeautifulSoup(arg,'lxml')
     for var in soup.findAll('a', class_="media mediafile mf_pdf"):
-        _n = var["title"]
-        _h = var['href']
-        _n = ('.pdf'.join(_n.split('.pdf')[:-1]) + '.pdf')
-        _n = _n.replace('_', ' ').replace('corp', '').replace('pld', '')
-        _path = save_dir + _n
-        write_file(_path, _h)
-        _files.append(_path)
-    return _files
+        n = var["title"]
+        h = var['href']
+        n = ('.pdf'.join(n.split('.pdf')[:-1]) + '.pdf')
+        n = n.replace('corp', '').replace('pld', '')
+        path = (save_dir) + n.replace('corp:pld:', '').replace('_', ' ').replace('corp:','').replace('pld1:', '').replace('it:', '').replace('tp:', '').replace('/', '').replace('\\', '').replace(':', '')
+        write_file(path, h)
+        files.append(path)
+    return files
 
 @bot.message_handler(content_types=['text'])
 def pld(message):
+    global links
     global request_num
     global request_str
     global request
-    _chat_id = message.chat.id
-    _command = get_command(message.text).lower()
+    global request_drs
+    chat_id = message.chat.id
+    command = get_command(message.text).lower()
     
     try:
-        _args = extract_arg(message.text)[0]
+        args = extract_arg(message.text)[0]
     except:
-        _args = ''
+        args = ''
         pass
         
     try:
         #FREE PORT
-        if ((_command == 'порт') and (_args != "")):
-            if check_command_allow(_chat_id, _command):
+        if ((command == 'порт') and (args != "")):
+            if check_command_allow(chat_id, command):
                 if (check_IPV4(message.text.split(' ')[1])!= "") :
-                    _ip = check_IPV4(message.text.split(' ')[1])
-                    if check_comm_aviability(_ip) > 0 :
-                        msg = "Свободные порты на коммутаторе " + _ip + ":\n"
-                        port_res = free_ports(_ip)
+                    ip = check_IPV4(message.text.split(' ')[1])
+                    if check_comm_aviability(ip) > 0 :
+                        msg = "Свободные порты на коммутаторе " + ip + ":\n"
+                        port_res = free_ports(ip)
                         for port in port_res :
                             msg = msg + str(port[0]) + ", "
                         bot.reply_to(message, msg[:-2])
                     else :
-                        bot.reply_to(message, "Коммутатор " + _ip + " недоступен или не существует")
+                        bot.reply_to(message, "Коммутатор " + ip + " недоступен или не существует")
             else:
-                msg = 'UNAUTORIZED ACCESS ATTEMP from '+str(_chat_id)
+                msg = 'UNAUTORIZED ACCESS ATTEMP from '+str(chat_id)
                 logging.warning(msg)
-        #WIKI SEARCH
-        elif ((_command == 'плд') and (_args != "")):
-            if check_command_allow(_chat_id, _command):
-            
-                msg = 'pld search: "' + 'плд ' + _args + '" from: ' + str(_chat_id)
-                logging.warning(msg)
-                c = search_pages(_args)
-                soup = BeautifulSoup(c,'lxml')
-                svars = {}
-                
-                for var in soup.findAll('a', class_="wikilink1"):
-                    svars[var['title']] = var['href']
+        if ((command == 'схема') and (args != "")):
+            if check_command_allow(chat_id, command):
+                try:
+                    house = ' '.join(args.split(' ')[-1:])
+                    street = ' '.join(args.split(' ')[:-1])
+                                       
+                    msg = get_street_id(street, house)
                     
-                num = 0
-                msg = ""
-                for key in svars:
-                    num += 1
-                    msg += "➡️ " + str(num) + " " + key.replace('corp:pld:', '').replace('_', ' ').replace('corp:','').replace('pld1:', '').replace('it:', '').replace('tp:', '') + "\n"
+                    if msg == '':
+                        msg = "Неправильный адрес"
+                        bot.reply_to(message, msg)
+                    else:
+                        schemes = msg
+                        msg = ""
+                        _l = []
+                        for key in range(len(schemes)):
+                            _s = str(schemes[key]).replace('\'','')
+                            _s = _s[1:-1].replace(',', '')
+                            _g = _s.split()
+                            _l.append(_g)
+                        
+                        num = 0
+                        files = []
+                        
+                        print(_l)
+                        
+                        
+                        for key in _l:
+                            if (key[-1][len(key[-1])-3:]) != 'vsd':
+                                for i in key:
+                                    if (i.isdigit()):
+                                        sname = key[key.index(i)+1]
+                                num += 1
+                                #n = ('/'.join(key[-1].split('/')[-1:]))
+                                n = sname
+                                write_scheme(save_dir + n, key[-1])
+                                files.append(save_dir + n)
+                                print (key)
+
+                                
+                                
+                        if (len(files) == 0):
+                            bot.reply_to(message, "Нет файлов")
+                        else:
+                            count = len(files) // 10
+                            bot.reply_to(message, "Файлов нашлось: " + str(len(files)))
+                        
+                        for x in range(count + 1):
+                            bot.send_media_group(chat_id, [telebot.types.InputMediaDocument(open(doc, 'rb')) for doc in files[x*10:x*10+10]])
+                            time.sleep(wait_time)
+                            
+                    
+                except Exception as e:
+                    print (e)
+                    exc_type, exc_obj, exc_tb = sys.exc_info()
+                    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+                    logging.error(exc_type, fname, exc_tb.tb_lineno)
+                    pass
                 
-                if (len(msg) > 1023):
-                    msg = msg[:1023]
-                    msg = '➡️'.join(msg.split('➡️')[:-1])
-                    msg = "Нашлось совпадений: " + str(num) + "\nПревышена максимальная длина сообщения!\n\n" + msg
-                else:
-                    msg =  "Нашлось совпадений: " + str(num) + "\n\n" + msg
+        #WIKI SEARCH
+        elif ((command == 'плд') and (args != "")):
+            if check_command_allow(chat_id, command):
+            
+                msg = 'pld search: "' + 'плд ' + args + '" from: ' + str(chat_id)
+                logging.warning(msg)
+                
+                msg, num, svars = search_pages(args)
                 
                 if (num == 1):
                     bot.reply_to(message, msg)
                     keys = list(svars.keys())
                     src = svars.get(keys[num-1])
                     c = search_files(src)
-                    _files = parse_pdf(c)
-                    request = {_chat_id : False}
+                    files = parse_pdf(c)
+                    request = {chat_id : False}
                     
-                    if (len(_files) == 0):
+                    if (len(files) == 0):
                         bot.reply_to(message, "Нет файлов")
                     else:
-                        _count = len(_files) // 10
-                        bot.reply_to(message, "Файлов нашлось: " + str(len(_files)))
+                        count = len(files) // 10
+                        bot.reply_to(message, "Файлов нашлось: " + str(len(files)))
                         
-                        for x in range(_count + 1):
-                            bot.send_media_group(_chat_id, [telebot.types.InputMediaDocument(open(doc, 'rb')) for doc in _files[x*10:x*10+10]])
+                        for x in range(count + 1):
+                            bot.send_media_group(chat_id, [telebot.types.InputMediaDocument(open(doc, 'rb')) for doc in files[x*10:x*10+10]])
                             time.sleep(wait_time)
 
                 elif (num > 1):
                     msg += "\nКакой номер интересует?"
                     bot.reply_to(message, msg)
-                    request = {_chat_id : True}
-                    request_str = {_chat_id : svars}
-                    request_num = {_chat_id : num}
+                    request = {chat_id : True}
+                    request_str = {chat_id : svars}
+                    request_num = {chat_id : num}
                 else:
-                    bot.send_message(_chat_id, msg)
+                    bot.send_message(chat_id, msg)
             else:
-                msg = 'UNAUTORIZED ACCESS ATTEMP from '+str(_chat_id)
+                msg = 'UNAUTORIZED ACCESS ATTEMP from '+str(chat_id)
                 logging.warning(msg)
                 
-        elif (_command.isdigit() and request.get(_chat_id) and (int(_command)-1 <= request_num.get(_chat_id)) and (int(_command)-1 >= 0)):
-                request = {_chat_id : False}
-                keys = list(request_str.get(_chat_id).keys())
-                src = request_str.get(_chat_id).get(keys[int(_command)-1])
-                c = search_files(src)
-                _files = parse_pdf(c)
-                request = {_chat_id : False}
+        elif (command.isdigit() and request.get(chat_id) and (int(command)-1 <= request_num.get(chat_id)) and (int(command)-1 >= 0)):
+            request = {chat_id : False}
+            request_drs = {chat_id : False}
+            keys = list(request_str.get(chat_id).keys())
+            src = request_str.get(chat_id).get(keys[int(command)-1])
+            c = search_files(src)
+            files = parse_pdf(c)
+            request = {chat_id : False}
+            
+            if (len(files) == 0):
+                bot.reply_to(message, "Нет файлов")
+            else:
+                count = len(files) // 10
+                bot.reply_to(message, "Файлов нашлось: " + str(len(files)))
                 
-                if (len(_files) == 0):
-                    bot.reply_to(message, "Нет файлов")
-                else:
-                    _count = len(_files) // 10
-                    bot.reply_to(message, "Файлов нашлось: " + str(len(_files)))
-                    
-                    for x in range(_count + 1):
-                        bot.send_media_group(_chat_id, [telebot.types.InputMediaDocument(open(doc, 'rb')) for doc in _files[x*10:x*10+10]])
-                        time.sleep(wait_time)
+                for x in range(count + 1):
+                    bot.send_media_group(chat_id, [telebot.types.InputMediaDocument(open(doc, 'rb')) for doc in files[x*10:x*10+10]])
+                    time.sleep(wait_time)
+                        
+        # elif (command.isdigit() and request_drs.get(chat_id) and int(command)-1 >=0 and int(command)-1 < len(links.get(chat_id))):
+            # num = int(command)-1
+            # request_drs = {chat_id : False}
+            # request = {chat_id : False}
+            # link = links.get(chat_id)[num]
+            # n = ('/'.join(link.split('/')[-1:]))
+
+            # write_scheme(save_dir + n,link)
+            
+            # doc = open(save_dir + n, 'rb')
+            # bot.send_document(chat_id, doc)
+            
         else:
             pass
             
