@@ -63,8 +63,6 @@ bazadb_vars = {
 request_num = {}
 request_str = {}
 request = {}
-# request_drs = {}
-# links = {}
 
 def netdb_connect():
     netdb = mysql.connector.connect(
@@ -109,25 +107,6 @@ def free_ports(ip):
     comm_cur.close()
     netdb.close()
     return comm_cur.fetchall()
-    
-# def get_street_id(street, house):
-    # bazadb = bazadb_connect()
-    # cur = bazadb.cursor(buffered=True)
-    # _sql = """select b.id from buildings b join streets s on s.id = b.street_id 
-                # where s.name = %s 
-                # and b.number = %s;"""
-    # cur.execute(_sql, (street, house))
-    # res = cur.fetchone()
-    # if res is not None:
-        # street_id = res[0]
-        # _sql = """select s.name, b.number, i.title, i.type, CONCAT('https://atk.is/schemes/', i.building_id, '/', i.date_upd, '.', i.fext) as link 
-                    # from buildings b join building_image i on b.id = i.building_id join streets s on s.id = b.street_id 
-                    # where b.id = %s;"""
-        # cur.execute(_sql, (street_id,))
-        # res = cur.fetchall()
-    # else:
-        # res = ''
-    # return res
     
 def get_drs(street, house):
     bazadb = bazadb_connect()
