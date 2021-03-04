@@ -391,7 +391,9 @@ def pld(message):
                     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
                     logging.error(exc_type, fname, exc_tb.tb_lineno)
                     pass
-                
+            else:
+                msg = 'UNAUTORIZED ACCESS ATTEMP from '+str(chat_id)
+                logging.warning(msg)
         #WIKI SEARCH
         elif ((command == 'плд') and (args != "")):
             if check_command_allow(chat_id, command):
@@ -485,6 +487,9 @@ def pld(message):
                     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
                     logging.error(exc_type, fname, exc_tb.tb_lineno)
                     pass
+            else:
+                msg = 'UNAUTORIZED ACCESS ATTEMP from '+str(chat_id)
+                logging.warning(msg)
                 
         elif (command.isdigit() and request.get(chat_id) and (int(command)-1 <= request_num.get(chat_id)) and (int(command)-1 >= 0)):
             request = {chat_id : False}
