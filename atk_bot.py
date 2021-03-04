@@ -90,6 +90,8 @@ def check_comm_aviability(ip):
     comm_cur = netdb.cursor(buffered=True)
     comm_cur.execute("select id from commutators where ip = '" + ip + "'")
     comm_res = comm_cur.fetchall()
+    comm_cur.close()
+    netdb.close()
     return len(comm_res)
     
 def free_ports(ip):
@@ -99,6 +101,8 @@ def free_ports(ip):
     comm_res = comm_cur.fetchone()
     comm_id = comm_res[0]
     comm_cur.execute("select p.number from net.ports p left outer join UTM5.ip_groups g on p.commutator_id = g.switch_id and p.number = g.port_id where p.commutator_id = " + str(comm_id)+" and p.type = 'empty' and g.account_id is null and p.number < 24 and (p.comment = '' or p.comment is null) order by p.number")
+    comm_cur.close()
+    netdb.close()
     return comm_cur.fetchall()
     
 # def get_street_id(street, house):
@@ -144,6 +148,8 @@ def get_drs(street, house):
     else:
         res1 = ''
         res2 = ''
+    cur.close()
+    bazadb.close()
     return res1, res2
     
 def get_link(street, house):
@@ -163,6 +169,8 @@ def get_link(street, house):
         res = cur.fetchall()
     else:
         res = ''
+    cur.close()
+    bazadb.close()
     return res
     
 def get_schemes_name(street, house):
@@ -182,6 +190,8 @@ def get_schemes_name(street, house):
         res = cur.fetchall()
     else:
         res = ''
+    cur.close()
+    bazadb.close()
     return res
 
 def check_command_allow(chat_id, command):
@@ -247,18 +257,21 @@ def search_pages(arg):
         msg = "Нашлось совпадений: " + str(num) + "\nПревышена максимальная длина сообщения!\n\n" + msg
     else:
         msg =  "Нашлось совпадений: " + str(num) + "\n\n" + msg
-                
+    
+    r.close()
     return msg, num, svars
     
 def search_files(arg):
     s = s = start_session()
     r = s.get(url.get('root_url') + arg, headers = {'User-Agent': user_agent_val})
     c = r.content
+    r.close()
     return c
     
 def get_file(arg):
     s = start_session()
     r = s.get(url.get('root_url') + arg, headers = {'User-Agent': user_agent_val})
+    r.close()
     return r
     
 def write_file(n, h):
@@ -274,6 +287,7 @@ def write_scheme(n, h):
     r = s.get(h, headers = {'User-Agent': user_agent_val})
     f.write(r.content)
     f.close()
+    r.close()
     
 def parse_pdf(arg):
     files = []
