@@ -96,11 +96,16 @@ def check_comm_aviability(ip):
     
 def free_ports(ip):
     netdb = netdb_connect()
-    comm_cur = netdb.cursor()
-    comm_cur.execute("select id from commutators where ip = '" + ip + "'")
+    comm_cur = netdb.cursor(buffered=True)
+    _sql =("""select id from commutators 
+            where ip = %s""")
+    comm_cur.execute(_sql, (ip, ))
     comm_res = comm_cur.fetchone()
     comm_id = comm_res[0]
-    comm_cur.execute("select p.number from net.ports p left outer join UTM5.ip_groups g on p.commutator_id = g.switch_id and p.number = g.port_id where p.commutator_id = " + str(comm_id)+" and p.type = 'empty' and g.account_id is null and p.number < 24 and (p.comment = '' or p.comment is null) order by p.number")
+    _sql =("""select p.number from net.ports p left outer join UTM5.ip_groups g on p.commutator_id = g.switch_id and p.number = g.port_id 
+        where p.commutator_id = %s
+        and p.type = 'empty' and g.account_id is null and p.number < 24 and (p.comment = '' or p.comment is null) order by p.number""")
+    comm_cur.execute(_sql, (str(comm_id), ))
     comm_cur.close()
     netdb.close()
     return comm_cur.fetchall()
