@@ -178,6 +178,27 @@ def get_schemes_name(street, house):
     bazadb.close()
     return res
 
+def get_house_info(street, house):
+    bazadb = bazadb_connect()
+    cur = bazadb.cursor(buffered=True)
+    _sql = """select b.id from buildings b join streets s on s.id = b.street_id 
+                where s.name = %s 
+                and b.number = %s;"""
+    cur.execute(_sql, (street, house))
+    res = cur.fetchone()
+    if res is not None:
+        street_id = res[0]
+        _sql = """select description 
+                    from buildings b join building_image i on b.id = i.building_id join streets s on s.id = b.street_id 
+                    where b.id = %s;"""
+        cur.execute(_sql, (street_id,))
+        res = cur.fetchall()
+    else:
+        res = '?'
+    cur.close()
+    bazadb.close()
+    return res
+
 def check_command_allow(chat_id, command):
     for key in access_list: 
         access = access_list.get(key).split()
@@ -319,6 +340,31 @@ def pld(message):
             else:
                 msg = 'UNAUTORIZED ACCESS ATTEMP from '+str(chat_id)
                 logging.warning(msg)
+                
+        if ((command == 'инфа') and (args != "")):
+            if check_command_allow(chat_id, command):
+                
+                    house = ' '.join(args.split(' ')[-1:])
+                    street = ' '.join(args.split(' ')[:-1])
+                    info = get_house_info(street, house)
+                    msg = ""
+                    if (info != "" and info != "?"):
+                        msg = info[0]
+                    elif (info != "" and str(info) == "?"):
+                        msg = "Неправильный адрес"
+                    else:
+                        msg = "Нет инфы"
+                    
+                    if len(msg) > 1000:
+                        for x in range(0, len(msg), 1000):
+                            bot.reply_to(message, msg[x:x+1000])
+                    else:
+                        bot.reply_to(message, msg)
+
+            else:
+                msg = 'UNAUTORIZED ACCESS ATTEMP from '+str(chat_id)
+                logging.warning(msg)
+                
         if ((command == 'схема') and (args != "")):
             if check_command_allow(chat_id, command):
                 try:
