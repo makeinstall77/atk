@@ -2,6 +2,7 @@
  
 from configparser import ConfigParser
 from bs4 import BeautifulSoup
+from pyzabbix import ZabbixAPI
 import requests
 import telebot
 import sys
@@ -21,6 +22,10 @@ save_dir = config.get('vars', 'save_dir')
 user_agent_val = config.get('vars', 'user_agent_val')
 wait_time = int(config.get('vars', 'wait_time'))
 access_list = dict(config.items('access_list'))
+zabbix_host = config.get('zabbix', 'zabbix_host')
+zabbix_login = config.get('zabbix', 'login')
+zabbix_password = config.get('zabbix', 'password')
+zabbix_domain = config.get('zabbix', 'zabbix_domain')
 
 #setup logging
 logging.basicConfig(filename=os.path.basename(sys.argv[0])+'.log', level=logging.INFO)
@@ -29,6 +34,8 @@ logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
 #create bot instance
 try:
     bot = telebot.TeleBot(bot_id)
+    zapi = ZabbixAPI(zabbix_host)
+    zapi.login(zabbix_login, zabbix_password)
 except Exception as e:
     print (e)
     exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -63,6 +70,32 @@ bazadb_vars = {
 request_num = {}
 request_str = {}
 request = {}
+multiple_zabbix_host = {}
+multiple_zabbix_graphs = {}
+zabbix_num = {}
+zabbix_hosts = {}
+zabbix_graphs = {}
+   
+def zabbix_get_graph(n, gid):
+    h = zabbix_host + '/chart2.php?graphid=' + gid + '&from=now-4d&to=now&profileIdx=web.graphs.filter&profileIdx2=215348&width=1782&height=201&_=uphs9wop&screenid='
+    
+    f = open(n, "wb")
+    
+    s = requests.Session()
+    r = s.get(zabbix_host, headers = {'User-Agent': user_agent_val})
+    cookie = s.cookies.get('zbx_session', domain = zabbix_domain )
+    s.headers.update({'Referer': zabbix_host})
+    p = s.post(zabbix_host + '/index.php?login=1', {
+    'name' : zabbix_login, 
+    'password' : zabbix_password,
+    'enter' : 'Enter'
+    })
+    
+    r = s.get(h, headers = {'User-Agent': user_agent_val})
+    r.close()
+    
+    f.write(r.content)
+    f.close()
 
 def netdb_connect():
     netdb = mysql.connector.connect(
@@ -314,6 +347,12 @@ def pld(message):
     global request_str
     global request
     global request_drs
+    global multiple_zabbix_host
+    global multiple_zabbix_graphs
+    global zabbix_num
+    global zabbix_hosts
+    global zabbix_graphs
+    
     chat_id = message.chat.id
     command = get_command(message.text).lower()
     
@@ -337,6 +376,67 @@ def pld(message):
                         bot.reply_to(message, msg[:-2])
                     else :
                         bot.reply_to(message, "Коммутатор " + ip + " недоступен или не существует")
+            else:
+                msg = 'UNAUTORIZED ACCESS ATTEMP from '+str(chat_id)
+                logging.warning(msg)
+                
+        if ((command == 'график') and (args != "")):
+            if check_command_allow(chat_id, command):
+                
+                h = zapi.host.get(search={'host': args}, output=['hostid', 'name'])
+                print(h)
+                
+                if len(h) > 0:
+                    msg = 'Найдено совпадений: ' + str(len(h)) + '\n'
+                    
+                    for i in range(len(h)):
+                        msg += "➡️ " + str(i + 1) + ' ' + h[i].get('name') + '\n'
+                    
+                    if len(h) > 1 :
+                        msg += "Какой номер интересует?"
+                        bot.reply_to(message, msg)
+                        
+                        multiple_zabbix_host = {chat_id : True}
+                        zabbix_num = {chat_id : i}
+                        zabbix_hosts = {chat_id : h}
+                        
+                        #######################
+                        #MULTIPLE ZABBIX HOSTS#
+                        #######################
+                        
+                        
+                    elif len(h) == 1 :
+                        msg = 'Найдено совпадений: ' + str(len(h)) + '\n'
+                        n = h[0].get('name') 
+                        _id = h[0].get('hostid')
+                        msg += "➡️ " + '1 ' + n + '\n\n'
+                        
+                        g = zapi.graph.get(filter={'hostid':_id}, output=['graphid', 'name'], expandName=1)
+                        
+                        for i in range(len(g)):
+                            msg += "📊 " + (str(i + 1) + ' ' + g[i].get('name')) + '\n'
+                        
+                        if len(g) > 1 :
+                            msg += "Какой номер интересует?"
+                            bot.reply_to(message, msg)
+
+                            multiple_zabbix_graphs = {chat_id : True}
+                            zabbix_num = {chat_id : i}
+                            zabbix_graphs = {chat_id : g}
+                            
+                            ########################
+                            #MULTIPLE ZABBIX GRAPHS#
+                            ########################
+                            
+                        elif len(g) == 1 :
+                            y = 0
+                            _gid = g[y].get('graphid')
+                            _name = save_dir + 'graph.png'
+                            
+                            zabbix_get_graph(_name, _gid)
+                            img = open(_name, 'rb')
+                            bot.send_photo(chat_id, img)
+                        
             else:
                 msg = 'UNAUTORIZED ACCESS ATTEMP from '+str(chat_id)
                 logging.warning(msg)
@@ -515,6 +615,53 @@ def pld(message):
             else:
                 msg = 'UNAUTORIZED ACCESS ATTEMP from '+str(chat_id)
                 logging.warning(msg)
+                
+        # MULTIPLE ZABBIX GRAPHS 
+        elif (command.isdigit() and multiple_zabbix_graphs.get(chat_id) and (int(command)-1 <= zabbix_num.get(chat_id)) and (int(command) > 0)):
+            multiple_zabbix_graphs = {chat_id : False}
+            g = zabbix_graphs.get(chat_id)
+            y = int(command) - 1
+            _gid = g[y].get('graphid')
+            _name = save_dir + 'graph.png'
+            
+            zabbix_get_graph(_name, _gid)
+            img = open(_name, 'rb')
+            bot.send_photo(chat_id, img)
+        
+        
+        # MULTIPLE ZABBIX HOSTS       
+        elif (command.isdigit() and multiple_zabbix_host.get(chat_id) and (int(command)-1 <= zabbix_num.get(chat_id)) and (int(command) > 0)):
+            multiple_zabbix_host = {chat_id : False}
+            h = zabbix_hosts.get(chat_id)
+            x = int(command) - 1
+            n = h[x].get('name') 
+            _id = h[x].get('hostid')
+            #print(n + ' ' + _id)
+            g = zapi.graph.get(filter={'hostid':_id}, output=['graphid', 'name'], expandName=1)
+            
+            msg = ''
+            
+            for i in range(len(g)):
+                msg += "📊 " + (str(i + 1) + ' ' + g[i].get('name')) + '\n'
+            
+            if len(g) > 1 :
+                msg += "Какой номер интересует?"
+                bot.reply_to(message, msg)
+
+                multiple_zabbix_graphs = {chat_id : True}
+                zabbix_num = {chat_id : i}
+                zabbix_graphs = {chat_id : g}
+            
+                # for i in range(len(g)):
+                    # print(str(i + 1) + ' ' + g[i].get('name'))
+            elif len(g) == 1 :
+                y = 0
+                _gid = g[y].get('graphid')
+                _name = save_dir + 'graph.png'
+                
+                zabbix_get_graph(_name, _gid)
+                img = open(_name, 'rb')
+                bot.send_photo(chat_id, img)
                 
         elif (command.isdigit() and request.get(chat_id) and (int(command)-1 <= request_num.get(chat_id)) and (int(command)-1 >= 0)):
             request = {chat_id : False}
