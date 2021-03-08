@@ -10,6 +10,7 @@ import os
 import logging
 import time
 import mysql.connector
+import psycopg2
 #import streets
 
 #config init
@@ -26,6 +27,8 @@ zabbix_host = config.get('zabbix', 'zabbix_host')
 zabbix_login = config.get('zabbix', 'login')
 zabbix_password = config.get('zabbix', 'password')
 zabbix_domain = config.get('zabbix', 'zabbix_domain')
+zabbix_graph_width = config.get('zabbix', 'width')
+zabbix_graph_height = config.get('zabbix', 'height')
 
 #setup logging
 logging.basicConfig(filename=os.path.basename(sys.argv[0])+'.log', level=logging.INFO)
@@ -76,8 +79,20 @@ zabbix_num = {}
 zabbix_hosts = {}
 zabbix_graphs = {}
    
+def jur_graph(jid):
+    conn = psycopg2.connect(dbname='zabbix', user='postgres', host='172.16.0.246')
+    cursor = conn.cursor()
+    _sql = """select graphid from graphs 
+                where name = %s limit 1;"""
+    cursor.execute(_sql, (str(jid), ))
+    records = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+    return records
+       
 def zabbix_get_graph(n, gid):
-    h = zabbix_host + '/chart2.php?graphid=' + gid + '&from=now-4d&to=now&profileIdx=web.graphs.filter&profileIdx2=215348&width=1782&height=201&_=uphs9wop&screenid='
+    h = zabbix_host + '/chart2.php?graphid=' + gid + '&from=now-3d&to=now&profileIdx=web.graphs.filter&width=' + zabbix_graph_width + '&height=' + zabbix_graph_height
     
     f = open(n, "wb")
     
@@ -382,60 +397,81 @@ def pld(message):
                 
         if ((command == 'график') and (args != "")):
             if check_command_allow(chat_id, command):
-                
-                h = zapi.host.get(search={'host': args}, output=['hostid', 'name'])
-                print(h)
-                
-                if len(h) > 0:
-                    msg = 'Найдено совпадений: ' + str(len(h)) + '\n'
-                    
-                    for i in range(len(h)):
-                        msg += "➡️ " + str(i + 1) + ' ' + h[i].get('name') + '\n'
-                    
-                    if len(h) > 1 :
-                        msg += "Какой номер интересует?"
-                        bot.reply_to(message, msg)
-                        
-                        multiple_zabbix_host = {chat_id : True}
-                        zabbix_num = {chat_id : i}
-                        zabbix_hosts = {chat_id : h}
-                        
-                        #######################
-                        #MULTIPLE ZABBIX HOSTS#
-                        #######################
-                        
-                        
-                    elif len(h) == 1 :
-                        msg = 'Найдено совпадений: ' + str(len(h)) + '\n'
-                        n = h[0].get('name') 
+                if args.isdigit and len(args) < 10:
+                    j = jur_graph('Network traffic on jur' + str(args))
+                    if len(j) > 0:
+                        h = zapi.host.get(search={'host': 'r-jurs'}, output=['hostid'])
                         _id = h[0].get('hostid')
-                        msg += "➡️ " + '1 ' + n + '\n\n'
-                        
-                        g = zapi.graph.get(filter={'hostid':_id}, output=['graphid', 'name'], expandName=1)
-                        
-                        for i in range(len(g)):
-                            msg += "📊 " + (str(i + 1) + ' ' + g[i].get('name')) + '\n'
-                        
-                        if len(g) > 1 :
-                            msg += "Какой номер интересует?"
-                            bot.reply_to(message, msg)
 
-                            multiple_zabbix_graphs = {chat_id : True}
+                        _gid = str(j[0])[1:-2]
+                        _name = save_dir + 'jur.png'
+                                                                                   
+                        zabbix_get_graph(_name, _gid)
+                        img = open(_name, 'rb')
+                        bot.send_photo(chat_id, img)
+                    else:
+                        bot.reply_to(message, "Нет такого графика")
+                else:
+                    h = zapi.host.get(search={'host': args}, output=['hostid', 'name'])
+                    print(h)
+                    
+                    if len(h) > 0:
+                        msg = 'Найдено совпадений: ' + str(len(h)) + '\n'
+                        
+                        for i in range(len(h)):
+                            msg += "➡️ " + str(i + 1) + ' ' + h[i].get('name') + '\n'
+                        
+                        if len(h) > 1 :
+                            msg += "Какой номер интересует?"
+                            
+                            if len(msg) > 1000:
+                                for x in range(0, len(msg), 1000):
+                                    bot.reply_to(message, msg[x:x+1000])
+                            else:
+                                bot.reply_to(message, msg)
+                            
+                            multiple_zabbix_host = {chat_id : True}
                             zabbix_num = {chat_id : i}
-                            zabbix_graphs = {chat_id : g}
+                            zabbix_hosts = {chat_id : h}
                             
-                            ########################
-                            #MULTIPLE ZABBIX GRAPHS#
-                            ########################
+                            #######################
+                            #MULTIPLE ZABBIX HOSTS#
+                            #######################
                             
-                        elif len(g) == 1 :
-                            y = 0
-                            _gid = g[y].get('graphid')
-                            _name = save_dir + 'graph.png'
                             
-                            zabbix_get_graph(_name, _gid)
-                            img = open(_name, 'rb')
-                            bot.send_photo(chat_id, img)
+                        elif len(h) == 1 :
+                            msg = 'Найдено совпадений: ' + str(len(h)) + '\n'
+                            n = h[0].get('name') 
+                            _id = h[0].get('hostid')
+                            msg += "➡️ " + '1 ' + n + '\n\n'
+                            
+                            g = zapi.graph.get(filter={'hostid':_id}, output=['graphid', 'name'], expandName=1)
+                            
+                            for i in range(len(g)):
+                                msg += "📊 " + (str(i + 1) + ' ' + g[i].get('name')) + '\n'
+                            
+                            if len(g) > 1 :
+                                msg += "Какой номер интересует?"
+                                bot.reply_to(message, msg)
+
+                                multiple_zabbix_graphs = {chat_id : True}
+                                zabbix_num = {chat_id : i}
+                                zabbix_graphs = {chat_id : g}
+                                
+                                ########################
+                                #MULTIPLE ZABBIX GRAPHS#
+                                ########################
+                                
+                            elif len(g) == 1 :
+                                y = 0
+                                _gid = g[y].get('graphid')
+                                _name = save_dir + 'graph.png'
+                                
+                                zabbix_get_graph(_name, _gid)
+                                img = open(_name, 'rb')
+                                bot.send_photo(chat_id, img)
+                    else:
+                        bot.reply_to(message, "Нет такого графика")
                         
             else:
                 msg = 'UNAUTORIZED ACCESS ATTEMP from '+str(chat_id)
@@ -646,7 +682,12 @@ def pld(message):
             
             if len(g) > 1 :
                 msg += "Какой номер интересует?"
-                bot.reply_to(message, msg)
+                
+                if len(msg) > 1000:
+                    for x in range(0, len(msg), 1000):
+                        bot.reply_to(message, msg[x:x+1000])
+                else:
+                    bot.reply_to(message, msg)
 
                 multiple_zabbix_graphs = {chat_id : True}
                 zabbix_num = {chat_id : i}
