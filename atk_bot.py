@@ -155,7 +155,6 @@ def free_ports(ip):
     comm_cur.close()
     netdb.close()
     rez = comm_cur.fetchall()
-    print(rez)
     return rez
     
 def get_drs(street, house):
@@ -415,7 +414,6 @@ def pld(message):
                         bot.reply_to(message, "Нет такого графика юрика")
                 else:
                     h = zapi.host.get(search={'host': args}, output=['hostid', 'name'])
-                    print(h)
                     
                     if len(h) > 0:
                         msg = 'Найдено совпадений: ' + str(len(h)) + '\n'
@@ -538,7 +536,6 @@ def pld(message):
                                 n = key[0] + key[1][-4:]
                                 write_scheme(save_dir + n, key[1])
                                 files.append(save_dir + n)
-                                print (key)
                                 
                         if (len(files) == 0):
                             bot.reply_to(message, "Нет файлов")
@@ -616,9 +613,7 @@ def pld(message):
                         _link.append(str(link[key]).replace('\'','')[1:-2])
                     
                     _sum = [list(tup) for tup in zip(_name, _link)]
-                    
-                    print(str(_sum))
-                    
+                                       
                     if name == '':
                         msg = "Неправильный адрес"
                         bot.reply_to(message, msg)
@@ -629,11 +624,8 @@ def pld(message):
                         for key in _sum:
                             if (key[1][-3:]) != 'vsd':
                                 n = key[0] + key[1][-4:]
-                                print(n)
-                                print(key[1])
                                 write_scheme(save_dir + n, key[1])
                                 files.append(save_dir + n)
-                                print (key)
                                 
                         if (len(files) == 0):
                             bot.reply_to(message, "Нет файлов")
@@ -658,9 +650,6 @@ def pld(message):
                 
         # MULTIPLE ZABBIX GRAPHS 
         elif (command.isdigit() and multiple_zabbix_graphs.get(chat_id) and (int(command)-1 <= zabbix_num.get(chat_id)) and (int(command) > 0)):
-            print(multiple_zabbix_graphs)
-            print(multiple_zabbix_graphs.get(chat_id))
-            print(zabbix_num)
             multiple_zabbix_graphs = {chat_id : False}
             g = zabbix_graphs.get(chat_id)
             y = int(command) - 1
@@ -679,7 +668,6 @@ def pld(message):
             x = int(command) - 1
             n = h[x].get('name') 
             _id = h[x].get('hostid')
-            #print(n + ' ' + _id)
             g = zapi.graph.get(filter={'hostid':_id}, output=['graphid', 'name'], expandName=1)
             
             msg = ''
@@ -700,8 +688,6 @@ def pld(message):
                 zabbix_num = {chat_id : i}
                 zabbix_graphs = {chat_id : g}
             
-                # for i in range(len(g)):
-                    # print(str(i + 1) + ' ' + g[i].get('name'))
             elif len(g) == 1 :
                 y = 0
                 _gid = g[y].get('graphid')
