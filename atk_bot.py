@@ -150,11 +150,13 @@ def free_ports(ip):
     comm_id = comm_res[0]
     _sql =("""select p.number from net.ports p left outer join UTM5.ip_groups g on p.commutator_id = g.switch_id and p.number = g.port_id 
         where p.commutator_id = %s
-        and p.type = 'empty' and g.account_id is null and p.number < 24 and (p.comment = '' or p.comment is null) order by p.number""")
+        and p.type = 'empty' and g.account_id is null and (p.comment = '' or p.comment is null) order by p.number""")
     comm_cur.execute(_sql, (str(comm_id), ))
     comm_cur.close()
     netdb.close()
-    return comm_cur.fetchall()
+    rez = comm_cur.fetchall()
+    print(rez)
+    return rez
     
 def get_drs(street, house):
     bazadb = bazadb_connect()
@@ -397,7 +399,7 @@ def pld(message):
                 
         if ((command == 'график') and (args != "")):
             if check_command_allow(chat_id, command):
-                if args.isdigit and len(args) < 10:
+                if args.isdigit() and len(args) < 10:
                     j = jur_graph('Network traffic on jur' + str(args))
                     if len(j) > 0:
                         h = zapi.host.get(search={'host': 'r-jurs'}, output=['hostid'])
@@ -410,7 +412,7 @@ def pld(message):
                         img = open(_name, 'rb')
                         bot.send_photo(chat_id, img)
                     else:
-                        bot.reply_to(message, "Нет такого графика")
+                        bot.reply_to(message, "Нет такого графика юрика")
                 else:
                     h = zapi.host.get(search={'host': args}, output=['hostid', 'name'])
                     print(h)
@@ -470,8 +472,10 @@ def pld(message):
                                 zabbix_get_graph(_name, _gid)
                                 img = open(_name, 'rb')
                                 bot.send_photo(chat_id, img)
+                            else:
+                                bot.reply_to(message, "Нет графиков у хоста " + n)
                     else:
-                        bot.reply_to(message, "Нет такого графика")
+                        bot.reply_to(message, "Нет такого хоста")
                         
             else:
                 msg = 'UNAUTORIZED ACCESS ATTEMP from '+str(chat_id)
@@ -654,6 +658,9 @@ def pld(message):
                 
         # MULTIPLE ZABBIX GRAPHS 
         elif (command.isdigit() and multiple_zabbix_graphs.get(chat_id) and (int(command)-1 <= zabbix_num.get(chat_id)) and (int(command) > 0)):
+            print(multiple_zabbix_graphs)
+            print(multiple_zabbix_graphs.get(chat_id))
+            print(zabbix_num)
             multiple_zabbix_graphs = {chat_id : False}
             g = zabbix_graphs.get(chat_id)
             y = int(command) - 1
