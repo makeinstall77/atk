@@ -11,6 +11,7 @@ import logging
 import time
 import mysql.connector
 import psycopg2
+from datetime import datetime
 #import streets
 
 #config init
@@ -29,6 +30,8 @@ zabbix_password = config.get('zabbix', 'password')
 zabbix_domain = config.get('zabbix', 'zabbix_domain')
 zabbix_graph_width = config.get('zabbix', 'width')
 zabbix_graph_height = config.get('zabbix', 'height')
+cam_login = config.get('cam', 'login')
+cam_password = config.get('cam', 'password')
 
 #setup logging
 logging.basicConfig(filename=os.path.basename(sys.argv[0])+'.log', level=logging.INFO)
@@ -356,6 +359,24 @@ def parse_pdf(arg):
         files.append(path)
     return files
 
+def send_camera_image(ip, message):
+    try:
+       
+        link = 'http://' + cam_login + ':' + cam_password + '@' + ip + '/ISAPI/Streaming/channels/101/picture/'
+        imageFile = save_dir + ip + "_" + str(datetime.timestamp(datetime.now())) + '.jpg'
+        os.system('wget '+link+' -O '+imageFile)
+        img = open(imageFile, 'rb')
+    
+        bot.send_photo(message.chat.id, img, caption = ip)
+    except Exception as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        logging.error(exc_type, fname, exc_tb.tb_lineno)
+        try:
+            bot.reply_to(message, e)
+        except:
+            pass
+
 @bot.message_handler(content_types=['text'])
 def pld(message):
     global links
@@ -392,6 +413,16 @@ def pld(message):
                         bot.reply_to(message, msg[:-2])
                     else :
                         bot.reply_to(message, "Коммутатор " + ip + " недоступен или не существует")
+            else:
+                msg = 'UNAUTORIZED ACCESS ATTEMP from '+str(chat_id)
+                logging.warning(msg)
+                
+        if ((command == 'камера') and (args != "")):
+            if check_command_allow(chat_id, command):
+                if (check_IPV4(message.text.split(' ')[1])!= "") :
+                    ip = check_IPV4(message.text.split(' ')[1])
+                    send_camera_image(ip, message)
+
             else:
                 msg = 'UNAUTORIZED ACCESS ATTEMP from '+str(chat_id)
                 logging.warning(msg)
@@ -730,10 +761,13 @@ def pld(message):
         except:
             pass
         pass
-try:
-	bot.polling(none_stop = True)
-except Exception as e:
-	exc_type, exc_obj, exc_tb = sys.exc_info()
-	fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-	logging.error(exc_type, fname, exc_tb.tb_lineno)
+        
+while True:
+    try:
+        bot.polling(none_stop = True)
+    except Exception as e:
+        time.sleep(5)
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        logging.error(exc_type, fname, exc_tb.tb_lineno)
 
