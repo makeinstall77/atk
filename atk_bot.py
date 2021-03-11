@@ -12,6 +12,14 @@ import time
 import mysql.connector
 import psycopg2
 from datetime import datetime
+from selenium import webdriver
+from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.common.by import By
+
 #import streets
 
 #config init
@@ -32,6 +40,11 @@ zabbix_graph_width = config.get('zabbix', 'width')
 zabbix_graph_height = config.get('zabbix', 'height')
 cam_login = config.get('cam', 'login')
 cam_password = config.get('cam', 'password')
+selenium_server = config.get('selenium', 'server')
+selenium_username = config.get('selenium', 'username')
+selenium_password = config.get('selenium', 'password')
+selenium_mo = config.get('selenium', 'mo')
+selenium_root = config.get('selenium', 'root')
 
 #setup logging
 logging.basicConfig(filename=os.path.basename(sys.argv[0])+'.log', level=logging.INFO)
@@ -365,9 +378,12 @@ def send_camera_image(ip, message):
         link = 'http://' + cam_login + ':' + cam_password + '@' + ip + '/ISAPI/Streaming/channels/101/picture/'
         imageFile = save_dir + ip + "_" + str(datetime.timestamp(datetime.now())) + '.jpg'
         os.system('wget '+link+' -O '+imageFile)
-        img = open(imageFile, 'rb')
-    
-        bot.send_photo(message.chat.id, img, caption = ip)
+        if os.path.getsize(imageFile) > 0:
+            img = open(imageFile, 'rb')
+            bot.send_photo(message.chat.id, img, caption = ip)
+        else:
+            bot.reply_to(message, "Изображение недоступно")
+            
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -376,6 +392,35 @@ def send_camera_image(ip, message):
             bot.reply_to(message, e)
         except:
             pass
+
+def send_mo(chat_id):
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--no-sandbox")
+
+    driver = webdriver.Remote(command_executor=selenium_server, desired_capabilities=DesiredCapabilities.CHROME, options=chrome_options)
+    driver.set_window_size(1200, 910)
+
+    driver.get(selenium_root)
+    driver.find_element_by_id("login").send_keys(selenium_username)
+    driver.find_element_by_id("pwd").send_keys(selenium_password)
+    driver.find_element_by_id("loginButton").click()
+    driver.get(selenium_mo)
+
+    timeout = 10
+    try:
+        element_present = EC.presence_of_element_located((By.ID, 'ws-canvas-graphic-overlay'))
+        WebDriverWait(driver, timeout).until(element_present)
+    except TimeoutException:
+        pass
+        #bot.send_message(chat_id, "Timed out waiting for page to load")
+    finally:
+        html_source = driver.page_source
+        driver.save_screenshot("screenshot.png")
+        driver.quit()  
+        file = open('screenshot.png', 'rb')
+        bot.send_photo(chat_id, file)
 
 @bot.message_handler(content_types=['text'])
 def pld(message):
@@ -426,10 +471,12 @@ def pld(message):
             else:
                 msg = 'UNAUTORIZED ACCESS ATTEMP from '+str(chat_id)
                 logging.warning(msg)
-                
+                               
         if ((command == 'график') and (args != "")):
             if check_command_allow(chat_id, command):
-                if args.isdigit() and len(args) < 10:
+                if args.lower() == "мо":
+                    send_mo(chat_id)
+                elif args.isdigit() and len(args) < 10:
                     j = jur_graph('Network traffic on jur' + str(args))
                     if len(j) > 0:
                         h = zapi.host.get(search={'host': 'r-jurs'}, output=['hostid'])
