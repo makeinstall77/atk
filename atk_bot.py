@@ -19,8 +19,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
-
-#import streets
+from pexpect import pxssh
 
 #config init
 config = ConfigParser()
@@ -42,9 +41,15 @@ cam_login = config.get('cam', 'login')
 cam_password = config.get('cam', 'password')
 selenium_server = config.get('selenium', 'server')
 selenium_username = config.get('selenium', 'username')
+selenium_usernamecross = config.get('selenium', 'usernamecross')
 selenium_password = config.get('selenium', 'password')
 selenium_mo = config.get('selenium', 'mo')
 selenium_root = config.get('selenium', 'root')
+selenium_root_cross = config.get('selenium', 'root_cross')
+selenium_cross_search = config.get('selenium', 'cross_search')
+ping_hostname = config.get('ping', 'hostname')
+ping_username = config.get('ping', 'username')
+ping_password = config.get('ping', 'password')
 
 #setup logging
 logging.basicConfig(filename=os.path.basename(sys.argv[0])+'.log', level=logging.INFO)
@@ -399,7 +404,7 @@ def send_mo(chat_id):
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--no-sandbox")
 
-    driver = webdriver.Remote(command_executor=selenium_server, desired_capabilities=DesiredCapabilities.CHROME, options=chrome_options)
+    driver = webdriver.Remote(command_executor = selenium_server, desired_capabilities=DesiredCapabilities.CHROME, options = chrome_options)
     driver.set_window_size(1200, 910)
 
     driver.get(selenium_root)
@@ -421,6 +426,101 @@ def send_mo(chat_id):
         driver.quit()  
         file = open('screenshot.png', 'rb')
         bot.send_photo(chat_id, file)
+        
+def send_map(chat_id, text):
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--no-sandbox")
+
+    driver = webdriver.Remote(command_executor = selenium_server, desired_capabilities=DesiredCapabilities.CHROME, options = chrome_options)
+    driver.set_window_size(1200, 910)
+
+    driver.get(selenium_root_cross)
+
+
+    timeout = 3
+
+    try:
+        element_present = EC.presence_of_element_located((By.ID, 'loginform'))
+        WebDriverWait(driver, timeout).until(element_present)
+    except TimeoutException:
+        print("Timed out waiting for page to load")
+    finally:
+        print("auth...")
+        driver.find_element_by_name("Login").send_keys(selenium_usernamecross)
+        driver.find_element_by_name("Password").send_keys(selenium_password)
+        driver.find_element_by_name("enter").click()
+
+        timeout = 3
+        try:
+            element_present = EC.presence_of_element_located((By.ID, 'loginform'))
+            WebDriverWait(driver, timeout).until(element_present)
+        except TimeoutException:
+            print("Timed out waiting for page to load")
+        finally:
+            print("opening profile...")
+            driver.find_element_by_name("SelectZone").click()
+            driver.get(selenium_cross_search)
+            timeout = 20
+
+            try:
+                element_present = EC.presence_of_element_located((By.ID, 'searchtree_set_new_8_span'))
+                WebDriverWait(driver, timeout).until(element_present)
+            except TimeoutException:
+                print("Timed out waiting for page to load")
+            finally:
+                print("map loaded")
+                time.sleep(1)
+                driver.find_element_by_xpath("//*[@class='Building SearchOL ItemInactive olButton ']").click()
+                time.sleep(1)
+                driver.find_element_by_xpath("//*[@class='ui-layout-toggler ui-layout-toggler-west ui-layout-toggler-open ui-layout-toggler-west-open']").click()
+                time.sleep(1)
+                driver.find_element_by_xpath("//*[@class='ui-layout-toggler ui-layout-toggler-east ui-layout-toggler-open ui-layout-toggler-east-open']").click()
+                time.sleep(1)
+                driver.find_element_by_name('templateId').send_keys("Владивосток " + text)
+                driver.find_element_by_id("SearchButton").click()
+                time.sleep(40)
+                driver.find_element_by_id("OpenLayers.Control.PanZoomBar_41_zoomin").click()
+                print("zoom 1")
+                time.sleep(5)
+                driver.find_element_by_id("OpenLayers.Control.PanZoomBar_41_zoomin").click()
+                print("zoom 2")
+                time.sleep(3)
+                driver.find_element_by_xpath("//*[@class='buttonSearchPanel buttonClose']").click()
+                time.sleep(1)
+                driver.save_screenshot("screenshot.png")
+                file = open('screenshot.png', 'rb')
+                bot.send_photo(chat_id, file)
+    driver.quit()  
+    
+def ping (ip, ping_type) :
+    try:
+        s = pxssh.pxssh()
+        hostname = ping_hostname
+        username = ping_username
+        password = ping_password
+        s.PROMPT = "~$"
+        if not s.login(hostname, username, password, auto_prompt_reset=False):
+            result = "ssh to monitoring failed"
+            print(result)
+            print(str(s))
+        else:
+            if ping_type == 1 :
+                s.sendline('ping -c 100 -i 0.2 ' + ip)
+                s.prompt()
+                answer = str(s.before, 'utf-8').split('\r\n')
+            elif ping_type == 2 :
+                s.sendline('pingf -c 1000 -s 1470 ' + ip)
+                s.prompt()
+                answer = str(s.before, 'utf-8').split('\r\n')
+            result = answer[-3] + '\n' + answer[-2]
+    except pxssh.ExceptionPxssh as e:
+        result = "pxssh failed on login"
+        print(result)
+        print(e)
+    print(result)
+    return result
 
 @bot.message_handler(content_types=['text'])
 def pld(message):
@@ -462,12 +562,47 @@ def pld(message):
                 msg = 'UNAUTORIZED ACCESS ATTEMP from '+str(chat_id)
                 logging.warning(msg)
                 
+        if ((command == 'пинг') and (args != "")):
+            if check_command_allow(chat_id, command):
+                if (check_IPV4(message.text.split(' ')[1])!= "") :
+                    ip = check_IPV4(message.text.split(' ')[1])
+                    if ip != "":
+                        msg = ping(ip, 1)
+                    else :
+                        msg = "Неправильный ip"
+                        
+                    bot.reply_to(message, msg)
+            else:
+                msg = 'UNAUTORIZED ACCESS ATTEMP from '+str(chat_id)
+                logging.warning(msg)
+                
+        if ((command == 'флуд') and (args != "")):
+            if check_command_allow(chat_id, command):
+                if (check_IPV4(message.text.split(' ')[1])!= "") :
+                    ip = check_IPV4(message.text.split(' ')[1])
+                    if ip != "":
+                        msg = ping(ip, 2)
+                    else :
+                        msg = "Неправильный ip"
+                        
+                    bot.reply_to(message, msg)
+            else:
+                msg = 'UNAUTORIZED ACCESS ATTEMP from '+str(chat_id)
+                logging.warning(msg)
+                
         if ((command == 'камера') and (args != "")):
             if check_command_allow(chat_id, command):
                 if (check_IPV4(message.text.split(' ')[1])!= "") :
                     ip = check_IPV4(message.text.split(' ')[1])
                     send_camera_image(ip, message)
 
+            else:
+                msg = 'UNAUTORIZED ACCESS ATTEMP from '+str(chat_id)
+                logging.warning(msg)
+                
+        if ((command == 'карта') and (args != "")):
+            if check_command_allow(chat_id, command):
+                send_map(chat_id, args)
             else:
                 msg = 'UNAUTORIZED ACCESS ATTEMP from '+str(chat_id)
                 logging.warning(msg)
