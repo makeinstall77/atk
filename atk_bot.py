@@ -1073,8 +1073,8 @@ def send_map(message, text):
                                     except Exception as e:
                                         error_capture(e=e, message=message)
                                     time.sleep(3)
-                                    driver.save_screenshot("screenshot.png")
-                                    file = open('screenshot.png', 'rb')
+                                    driver.save_screenshot(save_dir + "screenshot.png")
+                                    file = open(save_dir + "screenshot.png", 'rb')
                                     bot.send_photo(message.chat.id, file)
                                     file.close()
         driver.quit()
