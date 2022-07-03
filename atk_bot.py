@@ -1,31 +1,32 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
+
 import traceback
 import sys
-from configparser import ConfigParser
-from bs4 import BeautifulSoup
-from pyzabbix import ZabbixAPI
-from telebot import types
 import requests
 import telebot
 import os
 import logging
 import time
+import re
 import mysql.connector
 import psycopg2
-from datetime import datetime, timezone
+import gspread
+import psycopg2
+
+from configparser import ConfigParser
+from datetime import date, datetime, timezone
+from contextlib import closing
 from selenium import webdriver
-from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
 from pexpect import pxssh
-import gspread
-from datetime import date
-import re
-import psycopg2
-from contextlib import closing
+from bs4 import BeautifulSoup
+from pyzabbix import ZabbixAPI
+from telebot import types
+
 
 #config init
 config = ConfigParser()
@@ -81,7 +82,10 @@ try:
     sh_oe = gc.open_by_url(google_oe)
     sh_it = gc.open_by_url(google_it)
 except Exception as e:
-    #error_capture(e=e)
+    print (e)
+    msg = traceback.format_exc()
+    print (msg)
+    sys.exit(0)
     pass
 
 #getting other stuff from config
@@ -428,6 +432,8 @@ def free_ports(message):
                 where ip = %s""")
         comm_cur.execute(_sql, (ip, ))
         comm_res = comm_cur.fetchone()
+        comm_cur.close()
+        comm_cur = netdb.cursor(buffered=True)
         comm_id = comm_res[0]
         _sql =("""select p.number from net.ports p left outer 
                     join UTM5.ip_groups g on p.commutator_id = g.switch_id 
@@ -438,9 +444,9 @@ def free_ports(message):
                     and (p.comment = '' or p.comment is null) 
                     order by p.number""")
         comm_cur.execute(_sql, (str(comm_id), ))
+        rez = comm_cur.fetchall()
         comm_cur.close()
         netdb.close()
-        rez = comm_cur.fetchall()
         return rez
     
     if (check_IPV4(message.text.split(' ')[1])!= ""):
@@ -860,13 +866,12 @@ def send_mo(message):
         chrome_options.add_argument("--no-sandbox")
         #chrome_options.add_argument('--user-data-dir=~/.config/google-chrome')
         driver = webdriver.Remote(command_executor=selenium_server, \
-                desired_capabilities=DesiredCapabilities.CHROME, \
                 options=chrome_options)
         driver.set_window_size(1350, 1050)
         driver.get(selenium_root)
-        driver.find_element_by_id("login").send_keys(selenium_username)
-        driver.find_element_by_id("pwd").send_keys(selenium_password)
-        driver.find_element_by_id("loginButton").click()
+        driver.find_element(By.ID, "login").send_keys(selenium_username)
+        driver.find_element(By.ID, "pwd").send_keys(selenium_password)
+        driver.find_element(By.ID, "loginButton").click()
         driver.get(selenium_mo)
         timeout = 60
         try:
@@ -900,7 +905,6 @@ def send_it(message):
         chrome_options.add_argument("--no-sandbox")
         #chrome_options.add_argument('--user-data-dir=~/.config/google-chrome')
         driver = webdriver.Remote(command_executor=selenium_server, \
-                desired_capabilities=DesiredCapabilities.CHROME, \
                 options=chrome_options)
         driver.set_window_size(1220, 500)
         driver.get(google_it)
@@ -935,7 +939,6 @@ def send_oe(message):
         chrome_options.add_argument("--no-sandbox")
         #chrome_options.add_argument('--user-data-dir=~/.config/google-chrome')
         driver = webdriver.Remote(command_executor=selenium_server, \
-                desired_capabilities=DesiredCapabilities.CHROME, \
                 options=chrome_options)
         driver.set_window_size(1300, 980)
         driver.get(selenium_oe)
@@ -970,7 +973,6 @@ def send_map(message, text):
         chrome_options.add_argument("--no-sandbox")
         #chrome_options.add_argument('--user-data-dir=~/.config/google-chrome')
         driver = webdriver.Remote(command_executor=selenium_server, \
-                desired_capabilities=DesiredCapabilities.CHROME, \
                 options=chrome_options)
         driver.set_window_size(1200, 910)
         driver.get(selenium_root_cross)
@@ -983,9 +985,9 @@ def send_map(message, text):
             pass
         finally:
             
-            driver.find_element_by_name("Login").send_keys(selenium_usernamecross)
-            driver.find_element_by_name("Password").send_keys(selenium_password)
-            driver.find_element_by_name("enter").click()
+            driver.find_element(By.NAME, "Login").send_keys(selenium_usernamecross)
+            driver.find_element(By.NAME, "Password").send_keys(selenium_password)
+            driver.find_element(By.NAME, "enter").click()
             timeout = 3
             try:
                 element_present = EC.presence_of_element_located((By.ID, \
@@ -996,7 +998,7 @@ def send_map(message, text):
             except Exception as e:
                 error_capture(e=e, message=message)
             finally:
-                driver.find_element_by_name("SelectZone").click()
+                driver.find_element(By.NAME, "SelectZone").click()
                 driver.get(selenium_cross_search)
                 timeout = 80
                 try:
@@ -1011,7 +1013,7 @@ def send_map(message, text):
                     try:
                         element_present = EC.presence_of_element_located((By.XPATH, "//*[@class='Building SearchOL ItemInactive olButton ']"))
                         WebDriverWait(driver, timeout).until(element_present)
-                        driver.find_element_by_xpath("//*[@class='Building SearchOL ItemInactive olButton ']").click()
+                        driver.find_element(By.XPATH, "//*[@class='Building SearchOL ItemInactive olButton ']").click()
                     except TimeoutException:
                         pass
                     except Exception as e:
@@ -1020,7 +1022,7 @@ def send_map(message, text):
                         try:
                             element_present = EC.presence_of_element_located((By.XPATH, "//*[@class='ui-layout-toggler ui-layout-toggler-west ui-layout-toggler-open ui-layout-toggler-west-open']"))
                             WebDriverWait(driver, timeout).until(element_present)
-                            driver.find_element_by_xpath("//*[@class='ui-layout-toggler ui-layout-toggler-west ui-layout-toggler-open ui-layout-toggler-west-open']").click()
+                            driver.find_element(By.XPATH, "//*[@class='ui-layout-toggler ui-layout-toggler-west ui-layout-toggler-open ui-layout-toggler-west-open']").click()
                         except TimeoutException:
                             pass
                         except Exception as e:
@@ -1030,7 +1032,7 @@ def send_map(message, text):
                                 time.sleep(5)
                                 element_present = EC.presence_of_element_located((By.XPATH, "//*[@class='ui-layout-toggler ui-layout-toggler-east ui-layout-toggler-open ui-layout-toggler-east-open']"))
                                 WebDriverWait(driver, timeout).until(element_present)
-                                driver.find_element_by_xpath("//*[@class='ui-layout-toggler ui-layout-toggler-east ui-layout-toggler-open ui-layout-toggler-east-open']").click()
+                                driver.find_element(By.XPATH, "//*[@class='ui-layout-toggler ui-layout-toggler-east ui-layout-toggler-open ui-layout-toggler-east-open']").click()
                             except TimeoutException:
                                 pass
                             except Exception as e:
@@ -1040,13 +1042,13 @@ def send_map(message, text):
                                     time.sleep(3)
                                     element_present = EC.presence_of_element_located((By.NAME, 'templateId'))
                                     WebDriverWait(driver, timeout).until(element_present)
-                                    driver.find_element_by_name('templateId').send_keys("Россия, Приморский край, Владивосток " + text)
-                                    driver.find_element_by_id("SearchButton").click()
+                                    driver.find_element(By.NAME, 'templateId').send_keys("Россия, Приморский край, Владивосток " + text)
+                                    driver.find_element(By.ID, "SearchButton").click()
                                     try:
                                         time.sleep(20)
                                         element_present = EC.presence_of_element_located((By.XPATH, "//*[@class='firstAddress']"))
                                         WebDriverWait(driver, timeout).until(element_present)
-                                        driver.find_element_by_xpath("//*[@class='firstAddress']").click()
+                                        driver.find_element(By.XPATH, "//*[@class='firstAddress']").click()
                                         time.sleep(30)
                                     except TimeoutException:
                                         pass
@@ -1061,13 +1063,13 @@ def send_map(message, text):
                                     try:
                                         element_present = EC.presence_of_element_located((By.ID, "OpenLayers.Control.PanZoomBar_41_zoomin"))
                                         WebDriverWait(driver, timeout).until(element_present)
-                                        driver.find_element_by_id("OpenLayers.Control.PanZoomBar_41_zoomin").click()
+                                        driver.find_element(By.ID, "OpenLayers.Control.PanZoomBar_41_zoomin").click()
                                         element_present = EC.presence_of_element_located((By.ID, "OpenLayers.Control.PanZoomBar_41_zoomin"))
                                         WebDriverWait(driver, timeout).until(element_present)
-                                        driver.find_element_by_id("OpenLayers.Control.PanZoomBar_41_zoomin").click()
+                                        driver.find_element(By.ID, "OpenLayers.Control.PanZoomBar_41_zoomin").click()
                                         element_present = EC.presence_of_element_located((By.XPATH, "//*[@class='buttonSearchPanel buttonClose']"))
                                         WebDriverWait(driver, timeout).until(element_present)
-                                        driver.find_element_by_xpath("//*[@class='buttonSearchPanel buttonClose']").click()
+                                        driver.find_element(By.XPATH, "//*[@class='buttonSearchPanel buttonClose']").click()
                                     except TimeoutException:
                                         pass
                                     except Exception as e:
@@ -3021,53 +3023,6 @@ def cabletest(message, args):
                                     for element in answer:
                                         result += element + '\n'
                                     s.sendline('exit')
-                            # elif (switch.find("Image text-base: 0x80010000") != -1):
-                                # if int(port) > 0 and int(port) <= 8:
-                                    # s.sendline('show int f0/%s' % port)
-                                    # s.expect(hostname + '#')
-                                    # answer = str(s.before, 'utf-8').split('\r\n')
-                                    # for element in answer:
-                                        # result += element + '\n'
-                                    # s.sendline('show mac ad int f0/%s' % port)
-                                    # s.expect(hostname + '#')
-                                    # answer = str(s.before, 'utf-8').split('\r\n')
-                                    # for element in answer:
-                                        # result += element + '\n'
-                                    # s.sendline('exit')
-                                    # s.expect(hostname + '>')
-                                    # s.sendline('exit')
-                                # elif int(port) == 25:
-                                    # s.sendline('show int g1/1')
-                                    # s.expect(hostname + '#')
-                                    # answer = str(s.before, 'utf-8').split('\r\n')
-                                    # for element in answer:
-                                        # result += element + '\n'
-                                    # s.sendline('show mac ad int g1/1')
-                                    # s.expect(hostname + '#')
-                                    # answer = str(s.before, 'utf-8').split('\r\n')
-                                    # for element in answer:
-                                        # result += element + '\n'
-                                    # s.sendline('exit')
-                                    # s.expect(hostname + '>')
-                                    # s.sendline('exit')
-                                # elif int(port) == 26:
-                                    # s.sendline('show int g1/2')
-                                    # s.expect(hostname + '#')
-                                    # answer = str(s.before, 'utf-8').split('\r\n')
-                                    # for element in answer:
-                                        # result += element + '\n'
-                                    # s.sendline('show mac ad int g1/2')
-                                    # s.expect(hostname + '#')
-                                    # answer = str(s.before, 'utf-8').split('\r\n')
-                                    # for element in answer:
-                                        # result += element + '\n'    
-                                    # s.sendline('exit')
-                                    # s.expect(hostname + '>')
-                                    # s.sendline('exit')
-                                # else:
-                                    # s.sendline('exit')
-                                    # s.expect(hostname + '>')
-                                    # s.sendline('exit')
                             else:
                                 s.sendline('exit')
                                 s.sendline('exit')
