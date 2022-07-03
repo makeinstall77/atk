@@ -424,7 +424,7 @@ def check_comm_aviability(ip):
     netdb.close()
     return len(comm_res)
     
-def free_ports(message):
+def free_ports(message, args):
     def fnd(ip):
         netdb = netdb_connect()
         comm_cur = netdb.cursor(buffered=True)
@@ -448,9 +448,10 @@ def free_ports(message):
         comm_cur.close()
         netdb.close()
         return rez
-    
-    if (check_IPV4(message.text.split(' ')[1])!= ""):
-        ip = check_IPV4(message.text.split(' ')[1])
+
+    ip = check_IPV4(args)
+    print(ip)
+    if ip:
         if check_comm_aviability(ip) > 0:
             msg = "Свободные порты на коммутаторе " + ip + ":\n"
             port_res = fnd(ip)
@@ -458,16 +459,9 @@ def free_ports(message):
                 msg = msg + str(port[0]) + ", "
             bot.reply_to(message, msg[:-2])
         else:
-            if (check_IPV4(message.text.split(':')[1])!= "") :
-                ip = check_IPV4(message.text.split(':')[1])
-                if check_comm_aviability(ip) > 0 :
-                    msg = "Свободные порты на коммутаторе " + ip + ":\n"
-                    port_res = fnd(ip)
-                    for port in port_res :
-                        msg = msg + str(port[0]) + ", "
-                    bot.reply_to(message, msg[:-2])
-            else:
-                bot.reply_to(message, "Коммутатор " + ip + " недоступен или не существует.")
+            bot.reply_to(message, "Коммутатора с ip адресом: " + ip + " нет в базе.")
+    else:
+        bot.reply_to(message, "Неправильный ip адрес.")
 
 def get_scheme(args, message, stype):
     result = []
@@ -727,7 +721,7 @@ def check_IPV4(ip):
     elif ip.count(".") == 1 and all(isIPv4(i) for i in ip.split(".")):
         return "10.254." + ip
     else:
-        return ""
+        return False
 
 def extract_arg(arg):
     return arg.split(maxsplit=1)[1:]
@@ -3457,7 +3451,7 @@ def worker(message):
                 send_comment(args, message)
 
             elif ((command == 'порт') and (args != "")):
-                free_ports(message)
+                free_ports(message, args)
                 
             elif ((command == 'порт-инфо') and (args != "")):
                 port_info(args, message)
