@@ -1198,6 +1198,11 @@ def op_info(ip):
                     temp = str(round(float(temp)))
                 except:
                     temp = 'NaN'
+
+                #аптайм
+                s.sendline('sudo snmpwalk -v2c -c public %s DISMAN-EVENT-MIB::sysUpTimeInstance' % ip)
+                s.expect(ssh_prompt)
+                _uptime = str(s.before, 'utf-8').split('\r\n')[-1].split(') ')[-1]
                     
             else:
                 #аттенюатор
@@ -1260,7 +1265,12 @@ def op_info(ip):
                     temp = str(round(float(temp)))
                 except:
                     temp = 'NaN'
-            
+
+                #аптайм
+                s.sendline('sudo snmpwalk -v2c -c public %s DISMAN-EVENT-MIB::sysUpTimeInstance' % ip)
+                s.expect(ssh_prompt)
+                _uptime = str(s.before, 'utf-8').split('\r\n')[-1].split(') ')[-1]
+                
             result.append(att)
             result.append(eq)
             result.append(g)
@@ -1269,6 +1279,7 @@ def op_info(ip):
             result.append(model)
             result.append(op2)
             result.append(temp)
+            result.append(_uptime)
         
     except Exception as e:
         error_capture(e=e)
@@ -1936,8 +1947,7 @@ def op_mgmt(args, message, mode, op_list):
                 _op_power = '\nOptical In: ' + _val[3] + ' dBm\n'
             else:
                 _op_power = '\nOptical In1: ' + _val[3] + ' dBm\n' + 'Optical In2: ' + _val[6] + ' dBm\n'
-            msg = "➡️ " + _name + '\nIP: ' + _ip + _op_power + 'RF Out: ' + _val[4] + ' dBuV\nATT: ' + _val[0] + '\nEQ: ' + _val[1] + '\nАРУ (AGC): ' + _val[2] + ' dB\nTemp: ' + _val[7] + '°C\n\n'
-            #msg = "➡️ " + _name + '\nIP: ' + _ip + _op_power + '\n\n'
+            msg = "➡️ " + _name + '\nIP: ' + _ip + _op_power + 'RF Out: ' + _val[4] + ' dBuV\nATT: ' + _val[0] + '\nEQ: ' + _val[1] + '\nАРУ (AGC): ' + _val[2] + ' dB\nTemp: ' + _val[7] + '°C\nUptime: ' + _val[8] + '\n\n'
             bot.reply_to(message, msg)
             key = types.InlineKeyboardMarkup()
             but_1 = types.InlineKeyboardButton(text="Аттенюация", callback_data="OPA," + _payload)
@@ -1954,7 +1964,7 @@ def op_mgmt(args, message, mode, op_list):
                 _op_power = '\nOptical In: ' + _val[3] + ' dBm\n'
             else:
                 _op_power = '\nOptical In1: ' + _val[3] + ' dBm\n' + 'Optical In2: ' + _val[6] + ' dBm\n'
-            msg = "➡️ " + _name + '\nIP: ' + _ip + _op_power + 'RF Out: ' + _val[4] + ' dBuV\nATT: ' + _val[0] + '\nEQ: ' + _val[1] + '\nАРУ (AGC): ' + _val[2] + ' dB\nTemp: ' + _val[7] + '°C\n\n'
+            msg = "➡️ " + _name + '\nIP: ' + _ip + _op_power + 'RF Out: ' + _val[4] + ' dBuV\nATT: ' + _val[0] + '\nEQ: ' + _val[1] + '\nАРУ (AGC): ' + _val[2] + ' dB\nTemp: ' + _val[7] + '°C\nUptime: ' + _val[8] + '\n\n'
             
             bot.reply_to(message, msg)
             key = types.InlineKeyboardMarkup()
@@ -3141,7 +3151,7 @@ def inline(c):
             but_15 = types.InlineKeyboardButton(text="A14", callback_data="EA14," + _payback)
             but_16 = types.InlineKeyboardButton(text="A15", callback_data="EA15," + _payback)
             key.add(but_A, but_E, but_G, but_1, but_2, but_3, but_4, but_5, but_6, but_7, but_8, but_9, but_10, but_11, but_12, but_13, but_14, but_15, but_16)
-        msg = "➡️ " + _name + '\nIP: ' + _ip + _op_power + 'RF Out: ' + _val[4] + ' dBuV\nATT: ' + _val[0] + '\nEQ: ' + _val[1] + '\nАРУ (AGC): ' + _val[2] + ' dB\nTemp: ' + _val[7] + '°C\n\n'
+        msg = "➡️ " + _name + '\nIP: ' + _ip + _op_power + 'RF Out: ' + _val[4] + ' dBuV\nATT: ' + _val[0] + '\nEQ: ' + _val[1] + '\nАРУ (AGC): ' + _val[2] + ' dB\nTemp: ' + _val[7] + '°C\nUptime: ' + _val[8] + '\n\n'
         msg = re.escape(msg)
         msg = 'Настройка *аттенюации* на\:\n' + msg
     if _cmd == 'OPE':
@@ -3173,7 +3183,7 @@ def inline(c):
         but_15 = types.InlineKeyboardButton(text="E14", callback_data="EE14," + _payback)
         but_16 = types.InlineKeyboardButton(text="E15", callback_data="EE15," + _payback)
         key.add(but_A, but_E, but_G, but_1, but_2, but_3, but_4, but_5, but_6, but_7, but_8, but_9, but_10, but_11, but_12, but_13, but_14, but_15, but_16)
-        msg = "➡️ " + _name + '\nIP: ' + _ip + _op_power + 'RF Out: ' + _val[4] + ' dBuV\nATT: ' + _val[0] + '\nEQ: ' + _val[1] + '\nАРУ (AGC): ' + _val[2] + ' dB\nTemp: ' + _val[7] + '°C\n\n'
+        msg = "➡️ " + _name + '\nIP: ' + _ip + _op_power + 'RF Out: ' + _val[4] + ' dBuV\nATT: ' + _val[0] + '\nEQ: ' + _val[1] + '\nАРУ (AGC): ' + _val[2] + ' dB\nTemp: ' + _val[7] + '°C\nUptime: ' + _val[8] + '\n\n'
         msg = re.escape(msg)
         msg = 'Настройка *эквалайзера* на\:\n' + msg
     if _cmd == 'OPG':
@@ -3221,7 +3231,7 @@ def inline(c):
             but_2 = types.InlineKeyboardButton(text="-8", callback_data="EG-8," + _payback)
             but_3 = types.InlineKeyboardButton(text="-9", callback_data="EG-9," + _payback)
             key.add(but_A, but_E, but_G, but_1, but_2, but_3)
-        msg = "➡️ " + _name + '\nIP: ' + _ip + _op_power + 'RF Out: ' + _val[4] + ' dBuV\nATT: ' + _val[0] + '\nEQ: ' + _val[1] + '\nАРУ (AGC): ' + _val[2] + ' dB\nTemp: ' + _val[7] + '°C\n\n'
+        msg = "➡️ " + _name + '\nIP: ' + _ip + _op_power + 'RF Out: ' + _val[4] + ' dBuV\nATT: ' + _val[0] + '\nEQ: ' + _val[1] + '\nАРУ (AGC): ' + _val[2] + ' dB\nTemp: ' + _val[7] + '°C\nUptime: ' + _val[8] + '\n\n'
         msg = re.escape(msg)
         msg = 'Настройка *автоматической регулировки усиления* \(AGC\) на\:\n' + msg
     if _cmd[:2] == 'EA':
@@ -3283,7 +3293,7 @@ def inline(c):
             but_15 = types.InlineKeyboardButton(text="A14", callback_data="EA14," + _payback)
             but_16 = types.InlineKeyboardButton(text="A15", callback_data="EA15," + _payback)
             key.add(but_A, but_E, but_G, but_1, but_2, but_3, but_4, but_5, but_6, but_7, but_8, but_9, but_10, but_11, but_12, but_13, but_14, but_15, but_16)
-        msg = "➡️ " + _name + '\nIP: ' + _ip + _op_power + 'RF Out: ' + _val[4] + ' dBuV\nATT: ' + _val[0] + '\nEQ: ' + _val[1] + '\nАРУ (AGC): ' + _val[2] + ' dB\nTemp: ' + _val[7] + '°C\n\n'
+        msg = "➡️ " + _name + '\nIP: ' + _ip + _op_power + 'RF Out: ' + _val[4] + ' dBuV\nATT: ' + _val[0] + '\nEQ: ' + _val[1] + '\nАРУ (AGC): ' + _val[2] + ' dB\nTemp: ' + _val[7] + '°C\nUptime: ' + _val[8] + '\n\n'
         msg = re.escape(msg)
         msg = 'Настройка *аттенюации* на\:\n' + msg
     if _cmd[:2] == 'EG':
@@ -3333,7 +3343,7 @@ def inline(c):
             but_2 = types.InlineKeyboardButton(text="-8", callback_data="EG-8," + _payback)
             but_3 = types.InlineKeyboardButton(text="-9", callback_data="EG-9," + _payback)
             key.add(but_A, but_E, but_G, but_1, but_2, but_3)
-        msg = "➡️ " + _name + '\nIP: ' + _ip + _op_power + 'RF Out: ' + _val[4] + ' dBuV\nATT: ' + _val[0] + '\nEQ: ' + _val[1] + '\nАРУ (AGC): ' + _val[2] + ' dB\nTemp: ' + _val[7] + '°C\n\n'
+        msg = "➡️ " + _name + '\nIP: ' + _ip + _op_power + 'RF Out: ' + _val[4] + ' dBuV\nATT: ' + _val[0] + '\nEQ: ' + _val[1] + '\nАРУ (AGC): ' + _val[2] + ' dB\nTemp: ' + _val[7] + '°C\nUptime: ' + _val[8] + '\n\n'
         msg = re.escape(msg)
         msg = 'Настройка *автоматической регулировки усиления* \(AGC\) на\:\n' + msg
         
@@ -3368,7 +3378,7 @@ def inline(c):
         but_15 = types.InlineKeyboardButton(text="E14", callback_data="EE14," + _payback)
         but_16 = types.InlineKeyboardButton(text="E15", callback_data="EE15," + _payback)
         key.add(but_A, but_E, but_G, but_1, but_2, but_3, but_4, but_5, but_6, but_7, but_8, but_9, but_10, but_11, but_12, but_13, but_14, but_15, but_16)
-        msg = "➡️ " + _name + '\nIP: ' + _ip + _op_power + 'RF Out: ' + _val[4] + ' dBuV\nATT: ' + _val[0] + '\nEQ: ' + _val[1] + '\nАРУ (AGC): ' + _val[2] + ' dB\nTemp: ' + _val[7] + '°C\n\n'
+        msg = "➡️ " + _name + '\nIP: ' + _ip + _op_power + 'RF Out: ' + _val[4] + ' dBuV\nATT: ' + _val[0] + '\nEQ: ' + _val[1] + '\nАРУ (AGC): ' + _val[2] + ' dB\nTemp: ' + _val[7] + '°C\nUptime: ' + _val[8] + '\n\n'
         msg = re.escape(msg)
         msg = 'Настройка *эквалайзера* на\:\n' + msg
     if msg != '':
