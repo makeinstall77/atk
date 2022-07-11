@@ -1547,6 +1547,11 @@ def port_info(args, message):
                                     answer = str(s.before, 'utf-8').split('\r\n')
                                     for element in answer:
                                         result += element + '\n'
+                                    s.sendline('show int port %s statistics' % port)
+                                    s.expect(hostname + '#')
+                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    for element in answer:
+                                        result += element + '\n'
                                     s.sendline('show mac-address-table l2-address port %s' % port)
                                     s.expect(hostname + '#')
                                     answer = str(s.before, 'utf-8').split('\r\n')
@@ -1706,6 +1711,198 @@ def port_info(args, message):
             img_f.close()
         else:
             bot.reply_to(message, "Коммутатор " + ip + " недоступен или не существует.")
+
+def err_reset(args, message):
+    def get_file(arg):
+        s = start_session()
+        r = s.get(arg, headers={'User-Agent': user_agent_val})
+        r.close()
+        return r
+    
+    def write_file(n, h):
+        f = open(n, "wb")
+        r = get_file(h)
+        f.write(r.content)
+        f.close()
+    
+    if args.find(' ') != -1:
+        ip = args.split(' ')[0]
+        port = args.split(' ')[1]
+    else:
+        args = args.replace(' ', '')
+        if args.find(',') != -1:
+            ip = args.split(',')[0]
+            port = args.split(',')[1]
+        
+        elif args.find(':') != -1:
+            ip = args.split(':')[0]
+            port = args.split(':')[1]
+        else:
+            bot.reply_to(message, "Формат команды: 'сброс ip port'.")
+            return
+        
+    ip = check_IPV4(ip)
+    
+    if (ip != "" and port.isdigit()):
+        if check_comm_aviability(ip) > 0 :
+
+            result = 'Счётчики на порту успешно сброшены.'
+            answer = ''
+            
+            try:
+                s = pxssh.pxssh(timeout=90)
+                hostname = ping_hostname
+                username = ping_username
+                password = ping_password
+                ssh_prompt = '~$ '
+                if not s.login(hostname, username, password, auto_prompt_reset=False):
+                    result = "ssh to monitoring failed"
+                else:
+                    s.sendline('telnet %s' % ip)
+                    login = s.expect(['.*[Uu]sername:', '.*[Ll]ogin:', '.*User Name:', '.*~'])
+                    if login == 0 or login == 1 or login == 2:
+                        s.sendline('admin')
+                        s.expect(['[Pp]assword:', '[Pp]assword:'])
+                        s.sendline(sw_pass)
+                        mode = s.expect([">", "#", '.*:~'])
+                        if mode == 0:
+                            s.sendline("enable")
+                            s.expect("[Pp]assword:")
+                            s.sendline(sw_pass)
+                            mode = 1
+                        if mode == 1:
+                            s.sendline('show ver')
+                            s.expect("#")
+                            switch = str(s.before)
+                            s.sendline("terminal length 0")
+                            s.expect("#")
+                            s.sendline("")
+                            s.expect("#")
+                            hostname = str(s.before, 'utf-8').split('\r\n')[1]
+                            if (switch.find("S2226G") != -1):
+                                if int(port) > 0 and int(port) <= 24:
+                                    s.sendline('clear mib interface f0/%s' % port)
+                                    s.expect(hostname + '#')
+                                    s.sendline('exit')
+                                    s.expect(hostname + '>')
+                                    s.sendline('exit')
+                                elif int(port) == 25:
+                                    s.sendline('clear mib interface g0/1')
+                                    s.expect(hostname + '#')
+                                    s.sendline('exit')
+                                    s.expect(hostname + '>')
+                                    s.sendline('exit')
+                                elif int(port) == 26:
+                                    s.sendline('clear mib interface g0/2')
+                                    s.expect(hostname + '#')
+                                    s.sendline('exit')
+                                    s.expect(hostname + '>')
+                                    s.sendline('exit')
+                                else:
+                                    s.sendline('exit')
+                                    s.expect(hostname + '>')
+                                    s.sendline('exit')
+                            elif (switch.find("SNR-S2950-24G") != -1):
+                                if int(port) > 0 and int(port) <= 26:
+                                    s.sendline('clear counters interface e1/%s' % port)
+                                    s.expect(hostname + '#')
+                                    s.sendline('exit')
+                            elif (switch.find("Series Software, Version 2.1.1A Build 16162, RELEASE SOFTWARE") != -1):
+                                if int(port) > 0 and int(port) <= 48:
+                                    s.sendline('clear mib interface g0/%s' % port)
+                                    s.expect(hostname + '#')
+                                    s.sendline('exit')
+                                    s.expect(hostname + '>')
+                                    s.sendline('exit')
+                            elif (switch.find("Orion Alpha A26 Device") != -1):
+                                if int(port) > 0 and int(port) <= 26:
+                                    s.sendline('clear counters interface e1/%s' % port)
+                                    s.expect(hostname + '#')
+                                    s.sendline('exit')
+                            elif (switch.find("Alpha-A28F") != -1):
+                                if int(port) > 0 and int(port) <= 28:
+                                    s.sendline('conf')
+                                    s.expect(hostname + '#')
+                                    s.sendline('clear interface port %s statistics' % port)
+                                    s.expect(hostname + '#')
+                                    s.sendline('q')
+                                    s.expect(hostname + '#')
+                                    s.sendline('exit')
+                            elif (switch.find("SW version    1.1.48") != -1):
+                                if int(port) > 0 and int(port) <= 26:
+                                    s.sendline('clear counters GigabitEthernet 1/0/%s' % port)
+                                    s.expect('#')
+                                    s.sendline('exit')
+                            elif (switch.find("SNR-S2985G-24T") != -1):
+                                if int(port) > 0 and int(port) <= 28:
+                                    s.sendline('clear counters interface e1/0/%s' % port)
+                                    s.expect(hostname + '#')
+                                    s.sendline('exit')
+                            elif (switch.find("SNR-S2960-24G") != -1):
+                                if int(port) > 0 and int(port) <= 28:
+                                    s.sendline('clear counters interface e1/%s' % port)
+                                    s.expect(hostname + '#')
+                                    s.sendline('exit')
+                            elif (switch.find("SNR-S2965-8T") != -1):
+                                if int(port) > 0 and int(port) <= 10:
+                                    s.sendline('clear counters interface e1/0/%s' % port)
+                                    s.expect(hostname + '#')
+                                    s.sendline('exit')
+                            elif (switch.find("SNR-S2965-24T") != -1):
+                                if int(port) > 0 and int(port) <= 28:
+                                    s.sendline('clear counters interface e1/0/%s' % port)
+                                    s.expect(hostname + '#')
+                                    s.sendline('exit')
+                            elif (switch.find("Image text-base: 0x80010000") != -1):
+                                if int(port) > 0 and int(port) <= 8:
+                                    s.sendline('clear mib interface f0/%s' % port)
+                                    s.expect(hostname + '#')
+                                    s.sendline('exit')
+                                    s.expect(hostname + '>')
+                                    s.sendline('exit')
+                                elif int(port) == 25:
+                                    s.sendline('clear mib interface g1/1')
+                                    s.expect(hostname + '#')
+                                    s.sendline('exit')
+                                    s.expect(hostname + '>')
+                                    s.sendline('exit')
+                                elif int(port) == 26:
+                                    s.sendline('clear mib interface g1/2')
+                                    s.expect(hostname + '#')
+                                    s.sendline('exit')
+                                    s.expect(hostname + '>')
+                                    s.sendline('exit')
+                                else:
+                                    s.sendline('exit')
+                                    s.expect(hostname + '>')
+                                    s.sendline('exit')
+                            else:
+                                s.sendline('exit')
+                                s.sendline('exit')
+                                result = 'unknown model'
+                        if mode == 2:
+                            result = "couldn\'t connect to host"
+                    else:
+                        result = "couldn\'t connect to host"
+                    time.sleep(1)
+                    s.logout()
+            
+            except Exception as e:
+                error_capture(e=e)
+                result = "pxssh failed on login"
+            
+            msg = result
+            
+            if (len(msg) > 4000):
+                msg = "message is too long!\n\n" + msg[:4000]
+                msg = '`' + re.escape(msg) + '`'
+            else:
+                msg = '`' + re.escape(msg) + '`'
+            bot.reply_to(message, msg, parse_mode='MarkdownV2')
+            
+        else:
+            bot.reply_to(message, "Коммутатор " + ip + " недоступен или не существует.")
+
 
 def fiber(args, message): 
     if args.find(' ') != -1:
@@ -2540,6 +2737,7 @@ def hlp(message):
 🔸 сигнал — выводит информацию SFP модуля и уровни оптических сигналов по указанному порту коммутатора. Формат команды: 'сигнал <ip> <порт>'. В качестве разделителя можно использовать пробел, запятую или двоеточие.
 🔸 питание — выводит информацию о статусе электропитания коммутатора, если тот поддерживает это: 'питание <ip>'.
 🔸 кабельтест — проводит кабель тест на порту коммутатора, если тот поддерживает это: 'кабельтест <ip> <порт>'. В качестве разделителя можно использовать пробел, запятую или двоеточие.
+🔸 сброс — сбрасывает статистику на порту (счётчики ошибок, пакетов и прочее). Формат команды: 'сброс <ip> <порт>'. В качестве разделителя можно использовать пробел, запятую или двоеточие.
 🔸 актуалочка — выводит текущий список АВР/ППР/юриков с сортировкой по дате создания (сверху новые),
 статусы: 🟢 новая 🟡 в работе 🔵 ожидание компании 🔴 ожидание инженера 🟤 ожидание клиента"""
     bot.reply_to(message, msg)
@@ -3465,7 +3663,10 @@ def worker(message):
                 
             elif ((command == 'порт-инфо') and (args != "")):
                 port_info(args, message)
-                
+
+            elif ((command == 'сброс') and (args != "")):
+                err_reset(args, message)       
+
             elif ((command == 'сигнал') and (args != "")):
                 fiber(args, message)
                 
