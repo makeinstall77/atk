@@ -450,7 +450,6 @@ def free_ports(message, args):
         return rez
 
     ip = check_IPV4(args)
-    print(ip)
     if ip:
         if check_comm_aviability(ip) > 0:
             msg = "Свободные порты на коммутаторе " + ip + ":\n"
@@ -828,8 +827,8 @@ def parse_pdf(arg):
     return files
 
 def send_camera_image(args, message):
-    if (check_IPV4(message.text.split(' ')[1])!= ""):
-        ip = check_IPV4(message.text.split(' ')[1])
+    ip = check_IPV4(args)
+    if ip:
         link = 'http://' + cam_login + ':' + cam_password + '@' + ip \
                 + '/ISAPI/Streaming/channels/101/picture/'
         imageFile = save_dir + 'cams/' + ip + "_" \
@@ -1082,9 +1081,9 @@ def send_map(message, text):
         except:
             pass
     
-def ping (message, ping_type):
-    if (check_IPV4(message.text.split(' ')[1])!= ""):
-        ip = check_IPV4(message.text.split(' ')[1])
+def ping (message, ping_type, args):
+    ip = check_IPV4(args)
+    if ip:
         try:
             s = pxssh.pxssh()
             hostname = ping_hostname
@@ -1286,98 +1285,97 @@ def op_info(ip):
     return result
 
 def reboot(args, message):
-    if (check_IPV4(args) != ""):
-        ip = check_IPV4(args)
-        if ip != "":
-            result = ''
-            answer = 'ушёл курить'
-            try:
-                s = pxssh.pxssh()
-                hostname = ping_hostname
-                username = ping_username
-                password = ping_password
-                ssh_prompt = '~$ '
-                if not s.login(hostname, username, password, auto_prompt_reset=False):
-                    result = "ssh to monitoring failed"
-                else:
-                    s.sendline('telnet %s' % ip)
-                    login = s.expect(['.*[Uu]sername:', '.*[Ll]ogin:', '.*User Name:', '.*~'])
-                    if login == 0 or login == 1:
-                        s.sendline('admin')
-                        s.expect(['[Pp]assword:', '[Pp]assword:'])
+    ip = check_IPV4(args)
+    if ip:
+        result = ''
+        answer = 'ушёл курить'
+        try:
+            s = pxssh.pxssh()
+            hostname = ping_hostname
+            username = ping_username
+            password = ping_password
+            ssh_prompt = '~$ '
+            if not s.login(hostname, username, password, auto_prompt_reset=False):
+                result = "ssh to monitoring failed"
+            else:
+                s.sendline('telnet %s' % ip)
+                login = s.expect(['.*[Uu]sername:', '.*[Ll]ogin:', '.*User Name:', '.*~'])
+                if login == 0 or login == 1:
+                    s.sendline('admin')
+                    s.expect(['[Pp]assword:', '[Pp]assword:'])
+                    s.sendline(sw_pass)
+                    mode = s.expect([">", "#", '.*:~'])
+                    if mode == 0:
+                        s.sendline("enable")
+                        s.expect("[Pp]assword:")
                         s.sendline(sw_pass)
-                        mode = s.expect([">", "#", '.*:~'])
-                        if mode == 0:
-                            s.sendline("enable")
-                            s.expect("[Pp]assword:")
-                            s.sendline(sw_pass)
-                            mode = 1
-                        if mode == 1:
-                            s.sendline('show ver')
-                            s.expect("#")
-                            switch = str(s.before)
-                            s.sendline("terminal length 0")
-                            s.expect("#")
-                            s.sendline("")
-                            s.expect("#")
-                            hostname = str(s.before, 'utf-8').split('\r\n')[1]          
-                            if (switch.find("S2226G") != -1):
-                                s.sendline('reboot')
-                                s.sendline('y')
-                                result = ip + " S2226G ушёл в ребут"
-                            elif (switch.find("SNR-S2950-24G") != -1):
-                                s.sendline('reload')
-                                s.sendline('y')
-                                result = ip + " SNR-S2950-24G ушёл в ребут"
-                            elif (switch.find("Series Software, Version 2.1.1A Build 16162, RELEASE SOFTWARE") != -1):
-                                result = ip + " S2548GX..."
-                            elif (switch.find("Orion Alpha A26 Device") != -1):
-                                s.sendline('reload')
-                                s.sendline('y')
-                                result = ip + " Orion Alpha A26 ушёл в ребут"
-                            elif (switch.find("Alpha-A28F") != -1):
-                                s.sendline('reload')
-                                s.sendline('y')
-                                result = ip + " Orion Alpha-A28F ушёл в ребут"
-                            elif (switch.find("SNR-S2985G-24T") != -1):
-                                s.sendline('reload')
-                                s.sendline('y')
-                                result = ip + " SNR-S2985G-24T ушёл в ребут"
-                            elif (switch.find("SNR-S2965-24T") != -1):
-                                s.sendline('reload')
-                                s.sendline('y')
-                                result = ip + " SNR-S2965-24T ушёл в ребут"
-                            elif (switch.find("SNR-S2960-24G") != -1):
-                                s.sendline('reload')
-                                s.sendline('y')
-                                result = ip + " SNR-S2960-24G ушёл в ребут"
-                            elif (switch.find("SNR-S2965-8T") != -1):
-                                s.sendline('reload')
-                                s.sendline('y')
-                                result = ip + " SNR-S2965-8T ушёл в ребут"
-                        
-                            elif (switch.find("Image text-base: 0x80010000") != -1):
-                                s.sendline('reboot')
-                                s.sendline('y')
-                                result = ip + " S2210G ушёл в ребут"
-                            else:
-                                s.sendline('exit')
-                                s.sendline('exit')
-                                result = 'неизвестная модель'
-                        if mode == 2:
-                            result = "can\'t connect to host"
-                    elif login == 2:
-                        result = "can\'t connect to eltex switch"
-                    else:
+                        mode = 1
+                    if mode == 1:
+                        s.sendline('show ver')
+                        s.expect("#")
+                        switch = str(s.before)
+                        s.sendline("terminal length 0")
+                        s.expect("#")
+                        s.sendline("")
+                        s.expect("#")
+                        hostname = str(s.before, 'utf-8').split('\r\n')[1]          
+                        if (switch.find("S2226G") != -1):
+                            s.sendline('reboot')
+                            s.sendline('y')
+                            result = ip + " S2226G ушёл в ребут"
+                        elif (switch.find("SNR-S2950-24G") != -1):
+                            s.sendline('reload')
+                            s.sendline('y')
+                            result = ip + " SNR-S2950-24G ушёл в ребут"
+                        elif (switch.find("Series Software, Version 2.1.1A Build 16162, RELEASE SOFTWARE") != -1):
+                            result = ip + " S2548GX..."
+                        elif (switch.find("Orion Alpha A26 Device") != -1):
+                            s.sendline('reload')
+                            s.sendline('y')
+                            result = ip + " Orion Alpha A26 ушёл в ребут"
+                        elif (switch.find("Alpha-A28F") != -1):
+                            s.sendline('reload')
+                            s.sendline('y')
+                            result = ip + " Orion Alpha-A28F ушёл в ребут"
+                        elif (switch.find("SNR-S2985G-24T") != -1):
+                            s.sendline('reload')
+                            s.sendline('y')
+                            result = ip + " SNR-S2985G-24T ушёл в ребут"
+                        elif (switch.find("SNR-S2965-24T") != -1):
+                            s.sendline('reload')
+                            s.sendline('y')
+                            result = ip + " SNR-S2965-24T ушёл в ребут"
+                        elif (switch.find("SNR-S2960-24G") != -1):
+                            s.sendline('reload')
+                            s.sendline('y')
+                            result = ip + " SNR-S2960-24G ушёл в ребут"
+                        elif (switch.find("SNR-S2965-8T") != -1):
+                            s.sendline('reload')
+                            s.sendline('y')
+                            result = ip + " SNR-S2965-8T ушёл в ребут"
+                    
+                        elif (switch.find("Image text-base: 0x80010000") != -1):
+                            s.sendline('reboot')
+                            s.sendline('y')
+                            result = ip + " S2210G ушёл в ребут"
+                        else:
+                            s.sendline('exit')
+                            s.sendline('exit')
+                            result = 'неизвестная модель'
+                    if mode == 2:
                         result = "can\'t connect to host"
-                    try:
-                        time.sleep(1)
-                        s.logout()
-                    except:
-                        pass
-            except Exception as e:
-                error_capture(e = e)
-                result = "pxssh failed on login"
+                elif login == 2:
+                    result = "can\'t connect to eltex switch"
+                else:
+                    result = "can\'t connect to host"
+                try:
+                    time.sleep(1)
+                    s.logout()
+                except:
+                    pass
+        except Exception as e:
+            error_capture(e = e)
+            result = "pxssh failed on login"
                 
             bot.reply_to(message, result)
         else :
@@ -1414,9 +1412,8 @@ def port_info(args, message):
             bot.reply_to(message, "Формат команды: 'порт-инфо ip port'.")
             return
         
-    ip = check_IPV4(ip)
-    
-    if (ip != "" and port.isdigit()):
+    ip = check_IPV4(args)   
+    if (ip and port.isdigit()):
         if check_comm_aviability(ip) > 0 :
 
             result = ''
@@ -1741,9 +1738,8 @@ def err_reset(args, message):
             bot.reply_to(message, "Формат команды: 'сброс ip port'.")
             return
         
-    ip = check_IPV4(ip)
-    
-    if (ip != "" and port.isdigit()):
+    ip = check_IPV4(args)
+    if (ip and port.isdigit()):
         if check_comm_aviability(ip) > 0 :
 
             result = 'Счётчики на порту успешно сброшены.'
@@ -1921,9 +1917,8 @@ def fiber(args, message):
             bot.reply_to(message, "Формат команды: 'сигнал ip port'.")
             return
         
-    ip = check_IPV4(ip)
-    
-    if (ip != "" and port.isdigit()):
+    ip = check_IPV4(args)
+    if (ip and port.isdigit()):
         if check_comm_aviability(ip) > 0 :
 
             result = ''
@@ -2074,11 +2069,10 @@ def fiber(args, message):
         else:
             bot.reply_to(message, "Коммутатор " + ip + " недоступен или не существует.")
 
-def uptime(message):
+def uptime(message, args):
     result = '?'
-    ip = 'incorrect ip'
-    if (check_IPV4(message.text.split(' ')[1])!= "") :
-        ip = check_IPV4(message.text.split(' ')[1])
+    ip = check_IPV4(args)
+    if ip:
         if check_comm_aviability(ip) > 0:
             try:
                 s = pxssh.pxssh()
@@ -2868,8 +2862,7 @@ def get_comments(args):
           
 def power(message, args):
     ip = check_IPV4(args)
-    
-    if (ip != ""):
+    if ip:
         if check_comm_aviability(ip) > 0 :
 
             result = ''
@@ -2996,9 +2989,8 @@ def cabletest(message, args):
             bot.reply_to(message, "Формат команды: 'порт-инфо ip port'.")
             return
         
-    ip = check_IPV4(ip)
-    
-    if (ip != "" and port.isdigit()):
+    ip = check_IPV4(args)
+    if (ip and port.isdigit()):
         if check_comm_aviability(ip) > 0 :
 
             result = ''
@@ -3633,7 +3625,7 @@ def worker(message):
                 exp(message)  
 
             elif ((command == 'аптайм') and (args != "")):
-                uptime(message)
+                uptime(message, args)
                 
             elif ((command == 'кто') and (args != "")):
                 who(args, message)
@@ -3674,10 +3666,10 @@ def worker(message):
                 reboot(args, message)
         
             elif ((command == 'пинг') and (args != "")):
-                ping(message, 1)
+                ping(message, 1, args)
 
             elif ((command == 'флуд') and (args != "")):
-                ping(message, 2)
+                ping(message, 2, args)
                 
             elif ((command == 'камера') and (args != "")):
                 send_camera_image(args, message)
