@@ -1412,7 +1412,7 @@ def port_info(args, message):
             bot.reply_to(message, "Формат команды: 'порт-инфо ip port'.")
             return
         
-    ip = check_IPV4(args)   
+    ip = check_IPV4(ip)   
     if (ip and port.isdigit()):
         if check_comm_aviability(ip) > 0 :
 
@@ -1738,7 +1738,7 @@ def err_reset(args, message):
             bot.reply_to(message, "Формат команды: 'сброс ip port'.")
             return
         
-    ip = check_IPV4(args)
+    ip = check_IPV4(ip)
     if (ip and port.isdigit()):
         if check_comm_aviability(ip) > 0 :
 
@@ -1917,7 +1917,7 @@ def fiber(args, message):
             bot.reply_to(message, "Формат команды: 'сигнал ip port'.")
             return
         
-    ip = check_IPV4(args)
+    ip = check_IPV4(ip)
     if (ip and port.isdigit()):
         if check_comm_aviability(ip) > 0 :
 
@@ -2989,7 +2989,7 @@ def cabletest(message, args):
             bot.reply_to(message, "Формат команды: 'порт-инфо ip port'.")
             return
         
-    ip = check_IPV4(args)
+    ip = check_IPV4(ip)
     if (ip and port.isdigit()):
         if check_comm_aviability(ip) > 0 :
 
