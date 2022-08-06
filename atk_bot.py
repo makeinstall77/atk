@@ -1377,9 +1377,7 @@ def reboot(args, message):
             error_capture(e = e)
             result = "pxssh failed on login"
                 
-            bot.reply_to(message, result)
-        else :
-            bot.reply_to(message, "Коммутатор " + ip + " недоступен или не существует.")
+        bot.reply_to(message, result)
     else:
         bot.reply_to(message, args + " не является ip адресом.")
 
@@ -1708,6 +1706,53 @@ def port_info(args, message):
             img_f.close()
         else:
             bot.reply_to(message, "Коммутатор " + ip + " недоступен или не существует.")
+
+def show_errors(args, message):
+    if args.find(' ') != -1:
+        ip = args.split(' ')[0]
+        port = args.split(' ')[1]
+    else:
+        args = args.replace(' ', '')
+        if args.find(',') != -1:
+            ip = args.split(',')[0]
+            port = args.split(',')[1]
+        
+        elif args.find(':') != -1:
+            ip = args.split(':')[0]
+            port = args.split(':')[1]
+        else:
+            bot.reply_to(message, "Формат команды: 'сброс ip port'.")
+            return
+
+    result = '?'
+    ip = check_IPV4(ip)
+    if ip:
+        if check_comm_aviability(ip) > 0:
+            try:
+                s = pxssh.pxssh()
+                hostname = ping_hostname
+                username = login
+                password = password2
+                ssh_prompt = '\r\n' + login + ':~'
+                if not s.login(hostname, username, password, auto_prompt_reset=False):
+                    result = "ssh to monitoring failed"
+                else:
+                    msg = ip + ':' + port + '\n'
+                    s.sendline('sudo snmpwalk -v2c -c switch-comm %s  IF-MIB::ifInErrors.%s' % (ip, port))
+                    s.expect(ssh_prompt)
+                    result = str(s.before, 'utf-8').split(': ')[-1]
+                    msg = 'Входящие ошибки: ' + result + '\n'
+                    s.sendline('sudo snmpwalk -v2c -c switch-comm %s  IF-MIB::ifOutErrors.%s' % (ip, port))
+                    s.expect(ssh_prompt)
+                    result = str(s.before, 'utf-8').split(': ')[-1]
+                    msg += 'Исходящие ошибки: ' + result
+            except Exception as e:
+                error_capture(e=e)
+                result = "pxssh failed on login"
+        
+    else:
+        msg = "Коммутатор " + ip + " недоступен или не существует."
+    bot.reply_to(message, msg)     
 
 def err_reset(args, message):
     def get_file(arg):
@@ -2988,7 +3033,7 @@ def cabletest(message, args):
         else:
             bot.reply_to(message, "Формат команды: 'порт-инфо ip port'.")
             return
-        
+
     ip = check_IPV4(ip)
     if (ip and port.isdigit()):
         if check_comm_aviability(ip) > 0 :
@@ -3655,6 +3700,9 @@ def worker(message):
                 
             elif ((command == 'порт-инфо') and (args != "")):
                 port_info(args, message)
+
+            elif ((command == 'ошибки') and (args != "")):
+                show_errors(args, message)
 
             elif ((command == 'сброс') and (args != "")):
                 err_reset(args, message)       
