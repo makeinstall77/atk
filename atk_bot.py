@@ -1115,11 +1115,11 @@ def ping (message, ping_type, args):
                 if ping_type == 1 :
                     s.sendline('ping -c '+str(p_num)+' -i 0.2 ' + ip)
                     s.expect(ssh_prompt)
-                    answer = str(s.before, 'utf-8').split('\r\n')
+                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                 elif ping_type == 2 :
                     s.sendline('pingf -c '+str(p_num)+' -s 1470 ' + ip)
                     s.expect(ssh_prompt)
-                    answer = str(s.before, 'utf-8').split('\r\n')
+                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                 result = answer[-3] + '\n' + answer[-2]
             s.logout()
             
@@ -1148,12 +1148,12 @@ def op_info(ip):
         else:
             s.sendline('sudo snmpwalk -v2c -c public %s SNMPv2-MIB::sysDescr.0' % ip)
             s.expect(ssh_prompt)
-            model = str(s.before, 'utf-8').split('\r\n')[-1].split(' ')[-1]
+            model = s.before.decode('utf-8', "ignore").split('\r\n')[-1].split(' ')[-1]
             if model == '72GE':
                 #аттенюатор
                 s.sendline('sudo snmpwalk -v2c -c public %s SNMPv2-SMI::enterprises.11195.1.5.9.1.2.1' % ip)
                 s.expect(ssh_prompt)
-                att = str(s.before, 'utf-8').split('\r\n')[-1].split(' ')[-1]
+                att = s.before.decode('utf-8', "ignore").split('\r\n')[-1].split(' ')[-1]
                 try:
                     att = str(round(float(att) * 0.1))
                 except:
@@ -1162,7 +1162,7 @@ def op_info(ip):
                 #эквалайзер
                 s.sendline('sudo snmpwalk -v2c -c public %s SNMPv2-SMI::enterprises.11195.1.5.11.1.2.1' % ip)
                 s.expect(ssh_prompt)
-                eq = str(s.before, 'utf-8').split('\r\n')[-1].split(' ')[-1]
+                eq = s.before.decode('utf-8', "ignore").split('\r\n')[-1].split(' ')[-1]
                 try:
                     eq = str(round(float(eq) * 0.1))
                 except:
@@ -1171,7 +1171,7 @@ def op_info(ip):
                 #оптический усилитель
                 s.sendline('sudo snmpwalk -v2c -c public %s SNMPv2-SMI::enterprises.11195.1.5.13.0' % ip)
                 s.expect(ssh_prompt)
-                g = str(s.before, 'utf-8').split('\r\n')[-1].split(' ')[-1]
+                g = s.before.decode('utf-8', "ignore").split('\r\n')[-1].split(' ')[-1]
                 
                 try:
                     if int(g) == 256:
@@ -1186,12 +1186,12 @@ def op_info(ip):
                 #электрический сигнал 1
                 s.sendline('sudo snmpwalk -v2c -c public %s SNMPv2-SMI::enterprises.11195.1.5.16.1.2.2' % ip)
                 s.expect(ssh_prompt)
-                rf = str(s.before, 'utf-8').split('\r\n')[-1].split(' ')[-1]
+                rf = s.before.decode('utf-8', "ignore").split('\r\n')[-1].split(' ')[-1]
                 
                 #оптический сигнал 1
                 s.sendline('sudo snmpwalk -v2c -c public %s .1.3.6.1.4.1.11195.1.5.5.1.4.1' % ip)
                 s.expect(ssh_prompt)
-                op = str(s.before, 'utf-8').split('\r\n')[-1].split(' ')[-1] + '.0'
+                op = s.before.decode('utf-8', "ignore").split('\r\n')[-1].split(' ')[-1] + '.0'
                     
                 try:
                     op = str(round(float(op) * 0.1, 2))
@@ -1201,7 +1201,7 @@ def op_info(ip):
                 #оптический сигнал 2
                 s.sendline('sudo snmpwalk -v2c -c public %s .1.3.6.1.4.1.11195.1.5.5.1.4.2' % ip)
                 s.expect(ssh_prompt)
-                op2 = str(s.before, 'utf-8').split('\r\n')[-1].split(' ')[-1] + '.0'
+                op2 = s.before.decode('utf-8', "ignore").split('\r\n')[-1].split(' ')[-1] + '.0'
                 try:
                     op2 = str(round(float(op2) * 0.1, 2))
                 except:
@@ -1210,7 +1210,7 @@ def op_info(ip):
                 #температура
                 s.sendline('sudo snmpwalk -v2c -c public %s SNMPv2-SMI::enterprises.5591.1.3.1.13.0' % ip)
                 s.expect(ssh_prompt)
-                temp = str(s.before, 'utf-8').split('\r\n')[-1].split(' ')[-1] + '.0'
+                temp = s.before.decode('utf-8', "ignore").split('\r\n')[-1].split(' ')[-1] + '.0'
                 
                 try:
                     temp = str(round(float(temp)))
@@ -1220,13 +1220,13 @@ def op_info(ip):
                 #аптайм
                 s.sendline('sudo snmpwalk -v2c -c public %s DISMAN-EVENT-MIB::sysUpTimeInstance' % ip)
                 s.expect(ssh_prompt)
-                _uptime = str(s.before, 'utf-8').split('\r\n')[-1].split(') ')[-1]
+                _uptime = s.before.decode('utf-8', "ignore").split('\r\n')[-1].split(') ')[-1]
                     
             else:
                 #аттенюатор
                 s.sendline('sudo snmpwalk -v2c -c public %s .1.3.6.1.4.1.17409.1.10.11.1.9.1' % ip)
                 s.expect(ssh_prompt)
-                att = str(s.before, 'utf-8').split('\r\n')[-1].split(' ')[-1]
+                att = s.before.decode('utf-8', "ignore").split('\r\n')[-1].split(' ')[-1]
                 try:
                     att = str(round(float(att) * 0.1))
                 except:
@@ -1235,7 +1235,7 @@ def op_info(ip):
                 #эквалайзер
                 s.sendline('sudo snmpwalk -v2c -c public %s .1.3.6.1.4.1.17409.1.10.11.1.10.1' % ip)
                 s.expect(ssh_prompt)
-                eq = str(s.before, 'utf-8').split('\r\n')[-1].split(' ')[-1]
+                eq = s.before.decode('utf-8', "ignore").split('\r\n')[-1].split(' ')[-1]
                 try:
                     eq = str(round(float(eq) * 0.1))
                 except:
@@ -1244,7 +1244,7 @@ def op_info(ip):
                 #оптический усилитель
                 s.sendline('sudo snmpwalk -v2c -c public %s .1.3.6.1.4.1.17409.1.10.28.0' % ip)
                 s.expect(ssh_prompt)
-                g = str(s.before, 'utf-8').split('\r\n')[-1].split(' ')[-1]
+                g = s.before.decode('utf-8', "ignore").split('\r\n')[-1].split(' ')[-1]
                 try:
                     g = str(round(float(g) * 0.1))
                 except:
@@ -1253,12 +1253,12 @@ def op_info(ip):
                 #электрический сигнал 1
                 s.sendline('sudo snmpwalk -v2c -c public %s enterprises.17409.1.10.11.1.4.1' % ip)
                 s.expect(ssh_prompt)
-                rf = str(s.before, 'utf-8').split('\r\n')[-1].split(' ')[-1]
+                rf = s.before.decode('utf-8', "ignore").split('\r\n')[-1].split(' ')[-1]
                 
                 #оптический сигнал 1
                 s.sendline('sudo snmpwalk -v2c -c public %s enterprises.17409.1.10.5.1.2.1' % ip)
                 s.expect(ssh_prompt)
-                op = str(s.before, 'utf-8').split('\r\n')[-1].split(' ')[-1] + '.0'
+                op = s.before.decode('utf-8', "ignore").split('\r\n')[-1].split(' ')[-1] + '.0'
                 
                 try:
                     op = str(round(float(op) * 0.1, 2))
@@ -1268,7 +1268,7 @@ def op_info(ip):
                 #оптический сигнал 2
                 s.sendline('sudo snmpwalk -v2c -c public %s enterprises.17409.1.10.5.1.2.2' % ip)
                 s.expect(ssh_prompt)
-                op2 = str(s.before, 'utf-8').split('\r\n')[-1].split(' ')[-1] + '.0'
+                op2 = s.before.decode('utf-8', "ignore").split('\r\n')[-1].split(' ')[-1] + '.0'
                 try:
                     op2 = str(round(float(op2) * 0.1, 2))
                 except:
@@ -1277,7 +1277,7 @@ def op_info(ip):
                 #температура
                 s.sendline('sudo snmpwalk -v2c -c public %s .1.3.6.1.4.1.17409.1.3.3.2.2.1.12.1' % ip)
                 s.expect(ssh_prompt)
-                temp = str(s.before, 'utf-8').split('\r\n')[-1].split(' ')[-1] + '.0'
+                temp = s.before.decode('utf-8', "ignore").split('\r\n')[-1].split(' ')[-1] + '.0'
                 
                 try:
                     temp = str(round(float(temp)))
@@ -1287,7 +1287,7 @@ def op_info(ip):
                 #аптайм
                 s.sendline('sudo snmpwalk -v2c -c public %s DISMAN-EVENT-MIB::sysUpTimeInstance' % ip)
                 s.expect(ssh_prompt)
-                _uptime = str(s.before, 'utf-8').split('\r\n')[-1].split(') ')[-1]
+                _uptime = s.before.decode('utf-8', "ignore").split('\r\n')[-1].split(') ')[-1]
                 
             result.append(att)
             result.append(eq)
@@ -1337,7 +1337,7 @@ def reboot(args, message):
                         s.expect("#")
                         s.sendline("")
                         s.expect("#")
-                        hostname = str(s.before, 'utf-8').split('\r\n')[1]          
+                        hostname = s.before.decode('utf-8', "ignore").split('\r\n')[1]          
                         if (switch.find("S2226G") != -1):
                             s.sendline('reboot')
                             s.sendline('y')
@@ -1465,17 +1465,17 @@ def port_info(args, message):
                             s.expect("#")
                             s.sendline("")
                             s.expect("#")
-                            hostname = str(s.before, 'utf-8').split('\r\n')[1]
+                            hostname = s.before.decode('utf-8', "ignore").split('\r\n')[1]
                             if (switch.find("S2226G") != -1):
                                 if int(port) > 0 and int(port) <= 24:
                                     s.sendline('show int f0/%s' % port)
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n'
                                     s.sendline('show mac ad int f0/%s' % port)
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n'
                                     s.sendline('exit')
@@ -1484,12 +1484,12 @@ def port_info(args, message):
                                 elif int(port) == 25:
                                     s.sendline('show int g0/1')
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n'   
                                     s.sendline('show mac ad int g0/1')
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n'
                                     s.sendline('exit')
@@ -1498,12 +1498,12 @@ def port_info(args, message):
                                 elif int(port) == 26:
                                     s.sendline('show int g0/2')
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n'   
                                     s.sendline('show mac ad int g0/2')
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n'
                                     s.sendline('exit')
@@ -1517,12 +1517,12 @@ def port_info(args, message):
                                 if int(port) > 0 and int(port) <= 26:
                                     s.sendline('show int e1/%s' % port)
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n'
                                     s.sendline('show mac-address-table int e1/%s' % port)
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n'     
                                     s.sendline('exit')
@@ -1530,12 +1530,12 @@ def port_info(args, message):
                                 if int(port) > 0 and int(port) <= 48:
                                     s.sendline('show int g0/%s' % port)
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n'
                                     s.sendline('show mac ad int g0/%s' % port)
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n'
                                     s.sendline('exit')
@@ -1545,12 +1545,12 @@ def port_info(args, message):
                                 if int(port) > 0 and int(port) <= 26:
                                     s.sendline('show int e1/%s' % port)
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n'
                                     s.sendline('show mac-address-table int e1/%s' % port)
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n' 
                                     s.sendline('exit')
@@ -1558,17 +1558,17 @@ def port_info(args, message):
                                 if int(port) > 0 and int(port) <= 28:
                                     s.sendline('show int port %s' % port)
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n'
                                     s.sendline('show int port %s statistics' % port)
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n'
                                     s.sendline('show mac-address-table l2-address port %s' % port)
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n' 
                                     s.sendline('exit')
@@ -1576,12 +1576,12 @@ def port_info(args, message):
                                 if int(port) > 0 and int(port) <= 26:
                                     s.sendline('show interfaces status GigabitEthernet 1/0/%s' % port)
                                     s.expect('#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n'
                                     s.sendline('show mac address-table interface GigabitEthernet 1/0/%s' % port)
                                     s.expect('#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n' 
                                     s.sendline('exit')
@@ -1589,12 +1589,12 @@ def port_info(args, message):
                                 if int(port) > 0 and int(port) <= 28:
                                     s.sendline('show int e1/0/%s' % port)
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n'
                                     s.sendline('show mac-address-table int e1/0/%s' % port)
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n' 
                                     s.sendline('exit')
@@ -1602,12 +1602,12 @@ def port_info(args, message):
                                 if int(port) > 0 and int(port) <= 28:
                                     s.sendline('show int e1/%s' % port)
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n'
                                     s.sendline('show mac-address-table int e1/%s' % port)
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n' 
                                     s.sendline('exit')
@@ -1615,12 +1615,12 @@ def port_info(args, message):
                                 if int(port) > 0 and int(port) <= 10:
                                     s.sendline('show int e1/0/%s' % port)
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n'
                                     s.sendline('show mac-address-table int e1/0/%s' % port)
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n' 
                                     s.sendline('exit')
@@ -1628,12 +1628,12 @@ def port_info(args, message):
                                 if int(port) > 0 and int(port) <= 28:
                                     s.sendline('show int e1/0/%s' % port)
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n'
                                     s.sendline('show mac-address-table int e1/0/%s' % port)
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n' 
                                     s.sendline('exit')
@@ -1641,12 +1641,12 @@ def port_info(args, message):
                                 if int(port) > 0 and int(port) <= 8:
                                     s.sendline('show int f0/%s' % port)
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n'
                                     s.sendline('show mac ad int f0/%s' % port)
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n'
                                     s.sendline('exit')
@@ -1655,12 +1655,12 @@ def port_info(args, message):
                                 elif int(port) == 25:
                                     s.sendline('show int g1/1')
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n'
                                     s.sendline('show mac ad int g1/1')
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n'
                                     s.sendline('exit')
@@ -1669,12 +1669,12 @@ def port_info(args, message):
                                 elif int(port) == 26:
                                     s.sendline('show int g1/2')
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n'
                                     s.sendline('show mac ad int g1/2')
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n'    
                                     s.sendline('exit')
@@ -1838,7 +1838,7 @@ def err_reset(args, message):
                             s.expect("#")
                             s.sendline("")
                             s.expect("#")
-                            hostname = str(s.before, 'utf-8').split('\r\n')[1]
+                            hostname = s.before.decode('utf-8', "ignore").split('\r\n')[1]
                             if (switch.find("S2226G") != -1):
                                 if int(port) > 0 and int(port) <= 24:
                                     s.sendline('clear mib interface f0/%s' % port)
@@ -2017,7 +2017,7 @@ def fiber(args, message):
                             s.expect("#")
                             s.sendline("")
                             s.expect("#")
-                            hostname = str(s.before, 'utf-8').split('\r\n')[1]
+                            hostname = s.before.decode('utf-8', "ignore").split('\r\n')[1]
                             if (switch.find("S2226G") != -1):
                                 s.sendline('config')
                                 s.expect(hostname + '_config#')
@@ -2046,7 +2046,7 @@ def fiber(args, message):
                                 if int(port) > 24 and int(port) <= 26:
                                     s.sendline('show transceiver interface ethernet 1/%s detail' % port)
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n'
                                     s.sendline('exit')
@@ -2054,7 +2054,7 @@ def fiber(args, message):
                                 if int(port) > 24 and int(port) <= 26:
                                     s.sendline('show transceiver interface ethernet 1/%s detail' % port)
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n'
                                     s.sendline('exit')
@@ -2062,7 +2062,7 @@ def fiber(args, message):
                                 if int(port) > 0 and int(port) <= 28:
                                     s.sendline('show interface port %s transceiver' % port)
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n'
                                     s.sendline('exit')
@@ -2070,7 +2070,7 @@ def fiber(args, message):
                                 if int(port) > 24 and int(port) <= 26:
                                     s.sendline('show fiber-ports optical-transceiver interface GigabitEthernet 1/0/%s detailed' % port)
                                     s.expect('#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n'
                                     s.sendline('exit')
@@ -2078,7 +2078,7 @@ def fiber(args, message):
                                 if int(port) > 24 and int(port) <= 28:
                                     s.sendline('show transceiver interface ethernet 1/0/%s detail' % port)
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n'
                                     s.sendline('exit')
@@ -2086,7 +2086,7 @@ def fiber(args, message):
                                 if int(port) > 0 and int(port) <= 28:
                                     s.sendline('show transceiver interface ethernet 1/%s detail' % port)
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n'
                                     s.sendline('exit')
@@ -2094,7 +2094,7 @@ def fiber(args, message):
                                 if int(port) > 8 and int(port) <= 10:
                                     s.sendline('show transceiver interface ethernet 1/0/%s detail' % port)
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n'
                                     s.sendline('exit')
@@ -2102,7 +2102,7 @@ def fiber(args, message):
                                 if int(port) > 24 and int(port) <= 28:
                                     s.sendline('show transceiver interface ethernet 1/0/%s detail' % port)
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n'
                                     s.sendline('exit')
@@ -2171,7 +2171,7 @@ def op_set(ip, cmd):
         else:
             s.sendline('sudo snmpwalk -v2c -c public %s SNMPv2-MIB::sysDescr.0' % ip)
             s.expect(ssh_prompt)
-            model = str(s.before, 'utf-8').split('\r\n')[-1].split(' ')[-1]
+            model = s.before.decode('utf-8', "ignore").split('\r\n')[-1].split(' ')[-1]
             if model == '72GE':
                 if cmd[:1] == 'A':
                     s.sendline('sudo snmpset -v1 -c private %s .1.3.6.1.4.1.11195.1.5.9.1.2.1 i %s' % (ip, cmd[1:] + '0'))
@@ -2961,7 +2961,7 @@ def power(message, args):
                             s.expect("#")
                             s.sendline("")
                             s.expect("#")
-                            hostname = str(s.before, 'utf-8').split('\r\n')[1]
+                            hostname = s.before.decode('utf-8', "ignore").split('\r\n')[1]
                             if (switch.find("S2226G") != -1):
                                 result = 'S2226G не поддерживает мониторинг статуса электропитания.'
                                 s.sendline('exit')
@@ -2989,7 +2989,7 @@ def power(message, args):
                             elif (switch.find("SNR-S2985G-24T") != -1):
                                 s.sendline('show power status')
                                 s.expect(hostname + '#')
-                                answer = str(s.before, 'utf-8').split('\r\n')
+                                answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                 for element in answer:
                                     result += element + '\n'
                                 s.sendline('exit')
@@ -2999,14 +2999,14 @@ def power(message, args):
                             elif (switch.find("SNR-S2965-8T") != -1):
                                 s.sendline('show power status')
                                 s.expect(hostname + '#')
-                                answer = str(s.before, 'utf-8').split('\r\n')
+                                answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                 for element in answer:
                                     result += element + '\n'
                                 s.sendline('exit')
                             elif (switch.find("SNR-S2965-24T") != -1):
                                 s.sendline('show power status')
                                 s.expect(hostname + '#')
-                                answer = str(s.before, 'utf-8').split('\r\n')
+                                answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                 for element in answer:
                                     result += element + '\n'
                                 s.sendline('exit')
@@ -3089,7 +3089,7 @@ def cabletest(message, args):
                             s.expect("#")
                             s.sendline("")
                             s.expect("#")
-                            hostname = str(s.before, 'utf-8').split('\r\n')[1]
+                            hostname = s.before.decode('utf-8', "ignore").split('\r\n')[1]
                             if (switch.find("S2226G") != -1):
                                 if int(port) > 0 and int(port) <= 24:
                                     s.sendline('config')
@@ -3104,7 +3104,7 @@ def cabletest(message, args):
                                     s.expect(hostname + '#')
                                     s.sendline('show int f0/%s' % port)
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n'
                                     s.sendline('config')
@@ -3133,7 +3133,7 @@ def cabletest(message, args):
                                     s.expect(hostname + '#')
                                     s.sendline('show int g0/1')
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n'
                                     s.sendline('config')
@@ -3162,7 +3162,7 @@ def cabletest(message, args):
                                     s.expect(hostname + '#')
                                     s.sendline('show int g0/2')
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n'
                                     s.sendline('config')
@@ -3182,7 +3182,7 @@ def cabletest(message, args):
                                 if int(port) > 0 and int(port) <= 26:
                                     s.sendline('virtual-cable-test int e1/%s' % port)
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n'
                             elif (switch.find("Series Software, Version 2.1.1A Build 16162, RELEASE SOFTWARE") != -1):
@@ -3199,7 +3199,7 @@ def cabletest(message, args):
                                     s.expect(hostname + '#')
                                     s.sendline('show int g0/%s' % port)
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n'
                                     s.sendline('config')
@@ -3219,7 +3219,7 @@ def cabletest(message, args):
                                 if int(port) > 0 and int(port) <= 26:
                                     s.sendline('virtual-cable-test int e1/%s' % port)
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n'
                                     s.sendline('exit')
@@ -3227,12 +3227,12 @@ def cabletest(message, args):
                                 # if int(port) > 0 and int(port) <= 28:
                                     # s.sendline('show int port %s' % port)
                                     # s.expect(hostname + '#')
-                                    # answer = str(s.before, 'utf-8').split('\r\n')
+                                    # answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     # for element in answer:
                                         # result += element + '\n'
                                     # s.sendline('show mac-address-table l2-address port %s' % port)
                                     # s.expect(hostname + '#')
-                                    # answer = str(s.before, 'utf-8').split('\r\n')
+                                    # answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     # for element in answer:
                                         # result += element + '\n' 
                                     # s.sendline('exit')
@@ -3240,12 +3240,12 @@ def cabletest(message, args):
                                 # if int(port) > 0 and int(port) <= 26:
                                     # s.sendline('show interfaces status GigabitEthernet 1/0/%s' % port)
                                     # s.expect('#')
-                                    # answer = str(s.before, 'utf-8').split('\r\n')
+                                    # answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     # for element in answer:
                                         # result += element + '\n'
                                     # s.sendline('show mac address-table interface GigabitEthernet 1/0/%s' % port)
                                     # s.expect('#')
-                                    # answer = str(s.before, 'utf-8').split('\r\n')
+                                    # answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     # for element in answer:
                                         # result += element + '\n' 
                                     # s.sendline('exit')
@@ -3253,7 +3253,7 @@ def cabletest(message, args):
                                 if int(port) > 0 and int(port) <= 28:
                                     s.sendline('virtual-cable-test int e1/0/%s' % port)
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n'
                                     s.sendline('exit')
@@ -3261,7 +3261,7 @@ def cabletest(message, args):
                                 if int(port) > 0 and int(port) <= 28:
                                     s.sendline('virtual-cable-test int e1/%s' % port)
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n'
                                     s.sendline('exit')
@@ -3269,7 +3269,7 @@ def cabletest(message, args):
                                 if int(port) > 0 and int(port) <= 10:
                                     s.sendline('virtual-cable-test int e1/0/%s' % port)
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n'
                                     s.sendline('exit')
@@ -3277,7 +3277,7 @@ def cabletest(message, args):
                                 if int(port) > 0 and int(port) <= 28:
                                     s.sendline('virtual-cable-test int e1/0/%s' % port)
                                     s.expect(hostname + '#')
-                                    answer = str(s.before, 'utf-8').split('\r\n')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
                                         result += element + '\n'
                                     s.sendline('exit')
