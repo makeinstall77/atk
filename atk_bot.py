@@ -1104,7 +1104,7 @@ def ping (message, ping_type, args):
             bot.reply_to(message, "Максимальное количество пакетов: 1000.")
             p_num = str(1000)
         try:
-            s = pxssh.pxssh()
+            s = pxssh.pxssh(timeout=300)
             hostname = ping_hostname
             username = ping_username
             password = ping_password
@@ -1129,6 +1129,8 @@ def ping (message, ping_type, args):
         except Exception as e:
             error_capture(e=e)
             result = "pxssh failed on login"
+            msg = "timeout"
+            bot.reply_to(message, msg, parse_mode='MarkdownV2') 
 
            
     else:
@@ -2378,7 +2380,7 @@ def who(args, message):
                     
         elif args.lower() == "цус":
             if h>0 and h<9:
-                day = str(int(date.today().strftime("%d") - 1))
+                day = str(int(date.today().strftime("%d")) - 1)
             else:
                 day = date.today().strftime("%d")
             man = []
