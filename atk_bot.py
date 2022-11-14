@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
+#бот разросся, нужно разнести функционал по файлам: ядро бота отдельно, комманды отдельно в виде плагинов
+#нужно переосмыслить диалог с пользователем, избавиться от глобальных переменных
 
+#слишком много импортируем, надо пересмотреть всё это и не импортировать лишнее
 import traceback
 import sys
 import requests
@@ -13,6 +16,7 @@ import psycopg2
 import gspread
 import psycopg2
 
+#импортируем чуть меньше
 from configparser import ConfigParser
 from datetime import date, datetime, timezone
 from contextlib import closing
@@ -27,8 +31,7 @@ from bs4 import BeautifulSoup
 from pyzabbix import ZabbixAPI
 from telebot import types
 
-
-#config init
+#грузим всё из конфига
 config = ConfigParser()
 config.read('config.ini')
 bot_id = config.get('id', 'bot')
@@ -68,12 +71,12 @@ cacti_login = config.get('id', 'cacti_login')
 cacti_password = config.get('id', 'cacti_password')
 graph_port = config.get('id', 'graph_port')
 
-#setup logging
+#включаем логи в файл и в stdout
 logging.basicConfig(filename=os.path.basename(sys.argv[0]) + '.log', \
                                                 level=logging.INFO)
 logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
 
-#create bot instance
+#запускаемся даже без заббикса и гуглодиска, но что будет, если не запустится сам бот?
 try:
     bot = telebot.TeleBot(bot_id)
     zapi = ZabbixAPI(zabbix_host)
@@ -88,7 +91,7 @@ except Exception as e:
     sys.exit(0)
     pass
 
-#getting other stuff from config
+#догружаем из конфига
 url = {
     'root_url': config.get('url', 'root_url'),
     'ref_url_ref': config.get('url', 'ref_url_ref'),
@@ -146,7 +149,7 @@ pg_atk_bot_vars = {
     'database': config.get('pg_atk_bot', 'database')
 }
 
-#global vars
+#мерзкие глобальные переменные
 request_num = {}
 request_str = {}
 request = {}
@@ -159,6 +162,7 @@ zabbix_graphs = {}
 multiple_odf = {}
 multiple_odf_num = {}
 
+#отлавливаем ошибки и постим в тележный канал под логи
 def error_capture(**kwargs):
     options = {
             'e' : None,
@@ -183,6 +187,7 @@ def error_capture(**kwargs):
                  pass
         logging.error(msg)
 
+#каждую команду пишем в лог для истории запросов, включая неавторизованные
 def cmd_log(message, auth):
     _chat_id = str(message.chat.id)
     _lng = ''
@@ -219,6 +224,7 @@ def cmd_log(message, auth):
         logging.warning(msg)
         bot.send_message(log_chat_id, msg)
 
+#ищем в базе id здания
 def search_ids(street, house):
     bazadb = bazadb_connect()
     cur = bazadb.cursor(buffered=True)
@@ -240,6 +246,7 @@ def search_ids(street, house):
     bazadb.close()
     return result
 
+#постим графики трафика юриков
 def jur_graph(args, message):
     jid = 'Network traffic on jur' + str(args)
     records = ''
@@ -267,6 +274,7 @@ def jur_graph(args, message):
         bot.reply_to(message, "Нет такого графика юрика")
     return
 
+#ищем графики в заббиксе, захардкожен диапазон -- 3 дня
 def zabbix_get_graph(n, gid):
     h = zabbix_host + '/chart2.php?graphid=' + gid \
             + '&from=now-3d&to=now&profileIdx=web.graphs.filter&width=' \
@@ -286,9 +294,11 @@ def zabbix_get_graph(n, gid):
     f.write(r.content)
     f.close()
 
+#проверка на русский алфавит
 def match(text, alphabet=set('абвгдеёжзийклмнопрстуфхцчшщъыьэюя')):
     return not alphabet.isdisjoint(text.lower())
 
+#достаём из базы инфу по коммутатору на основе id здания
 def find_switch_by_address(args):
     #return [[switch 1 of street 1, switch 2 of street 1], [switch 1 of street 2], [...]]
     result = []
@@ -357,6 +367,7 @@ def find_switch_by_address(args):
     result = [x for x in result if x]
     return result
 
+#статус коммутаторов
 def switch_status(args, message):
     result = ''
     _streets = find_switch_by_address(args)
@@ -378,6 +389,7 @@ def switch_status(args, message):
                     result += _status + key[0] + ' ' + key[4] + '\n'
     send_msg_with_split(message, result, 4000)
 
+#подключаемся к локальной базе, нужна для определения привязки по районам
 def pg_connect():
     pg = psycopg2.connect(
         host = pg_atk_bot_vars.get('host'),
@@ -387,6 +399,7 @@ def pg_connect():
         )
     return pg
 
+#база трекера
 def etraxisdb_connect():
     etraxisdb = mysql.connector.connect(
         host = etraxisdb_vars.get('host'),
@@ -396,6 +409,7 @@ def etraxisdb_connect():
         )
     return etraxisdb
 
+#база коммутаторов
 def netdb_connect():
     netdb = mysql.connector.connect(
         host = netdb_vars.get('host'),
@@ -404,7 +418,8 @@ def netdb_connect():
         database = netdb_vars.get('database')
         )
     return netdb
-    
+
+#схемы, здания
 def bazadb_connect():
     bazadb = mysql.connector.connect(
         host = bazadb_vars.get('host'),
@@ -414,6 +429,7 @@ def bazadb_connect():
         )
     return bazadb
 
+#от малышева
 def check_comm_aviability(ip):
     netdb = netdb_connect()
     #Получаем id коммутатора
@@ -423,7 +439,8 @@ def check_comm_aviability(ip):
     comm_cur.close()
     netdb.close()
     return len(comm_res)
-    
+
+#свободные порты в коммутаторах
 def free_ports(message, args):
     def fnd(ip):
         netdb = netdb_connect()
@@ -462,6 +479,7 @@ def free_ports(message, args):
     else:
         bot.reply_to(message, "Неправильный ip адрес.")
 
+#ищем все схемы
 def get_scheme(args, message, stype):
     result = []
     def link(street_id, stype):
@@ -584,6 +602,7 @@ def get_scheme(args, message, stype):
     
     return result
 
+#инфа по зданию, тут возможно есть подводные
 def get_house_info(args, message):
     res = ''
     if match(args):
@@ -704,6 +723,7 @@ def get_house_info(args, message):
         msg = "Ничего не нашлось."
     send_msg_with_split(message, msg, 4000)
 
+#проверяем доступность команды для определённого чата
 def check_command_allow(message, command):
     full_cmd = access_list.get('command_list').split()
     chat_id = message.chat.id
@@ -716,6 +736,7 @@ def check_command_allow(message, command):
         cmd_log(message, _auth)
     return _auth
 
+#от малышева
 def check_IPV4(ip):
     def isIPv4(s):
         try: return str(int(s)) == s and 0 <= int(s) <= 255
@@ -727,12 +748,15 @@ def check_IPV4(ip):
     else:
         return False
 
+#отрезали команду, оставили всё остальное
 def extract_arg(arg):
     return arg.split(maxsplit=1)[1:]
-    
+
+#оставили команду, отрезали всё остальное
 def get_command(arg):
     return arg.split(' ', 1)[0]
-    
+
+#стартуем сессию для парсинга плд, притворяемся браузером, логинимся
 def start_session():
     s = requests.Session()
     r = s.get(url.get('root_url'), headers={'User-Agent': user_agent_val})
@@ -749,7 +773,8 @@ def start_session():
     'r': 1
     })
     return s
-    
+
+#стартуем сессию для кактуса, на данный момент нереализовано, можно выпилить
 def start_cacti_session():
     s = requests.Session()
     r = s.get(url.get('cacti_auth'), headers={'User-Agent': user_agent_val})
@@ -763,7 +788,8 @@ def start_cacti_session():
     'login_password': cacti_password,
     })
     return s
-    
+
+#поиск страничек в вики с плд
 def search_pages(arg):
     s = start_session()
     r = s.get(url.get('search_url') + arg, \
@@ -784,7 +810,8 @@ def search_pages(arg):
     msg = "Нашлось совпадений: " + str(num) + "\n\n" + msg
     r.close()
     return msg, num, svars
-    
+
+#это нужно скрестить с парсингом файлов
 def search_files(arg):
     s = s = start_session()
     r = s.get(url.get('root_url') + arg, \
@@ -792,20 +819,23 @@ def search_files(arg):
     c = r.content
     r.close()
     return c
-    
+
+#получаем урл файла
 def get_file(arg):
     s = start_session()
     r = s.get(url.get('root_url') + arg, \
             headers={'User-Agent': user_agent_val})
     r.close()
     return r
-    
+
+#сохраняем файл на диск
 def write_file(n, h):
     f = open(n, "wb")
     r = get_file(h)
     f.write(r.content)
     f.close()
-    
+
+#сохраняем схему на диск
 def write_scheme(n, h):
     s = requests.Session()
     r = s.get('https://atk.is/', headers={'User-Agent': user_agent_val})
@@ -814,7 +844,8 @@ def write_scheme(n, h):
     f.write(r.content)
     f.close()
     r.close()
-    
+
+#поиск файлов на страничках с плд
 def parse_pdf(arg):
     files = []
     soup = BeautifulSoup(arg,'lxml')
@@ -831,6 +862,7 @@ def parse_pdf(arg):
         files.append(path)
     return files
 
+#получаем картинку с камер хиквижн и хайвотч
 def send_camera_image(args, message):
     ip = check_IPV4(args)
     if ip:
@@ -856,6 +888,7 @@ def send_camera_image(args, message):
     else:
         bot.reply_to(message, "Неправильный ip.")
 
+#график МО, разрешение экрана захардкожено!
 def send_mo(message):
     try:
         chrome_options = Options()
@@ -895,6 +928,7 @@ def send_mo(message):
         except:
             pass
         
+#график ИТ/ЦУС, разрешение экрана захардкожено!
 def send_it(message):
     try:
         chrome_options = Options()
@@ -928,7 +962,8 @@ def send_it(message):
             bot.reply_to(message, e)
         except:
             pass
-        
+
+#график ОЭ, разрешение экрана захардкожено!
 def send_oe(message):
     try:
         chrome_options = Options()
@@ -963,6 +998,7 @@ def send_oe(message):
         except:
             pass
 
+#поиск по карте оптики, самая жрущая ресурсы хрень, тут костыль на костыле, тайминги подстроены под быстродействие конкретного тазика
 def send_map(message, text):
     try:
         chrome_options = Options()
@@ -1086,6 +1122,7 @@ def send_map(message, text):
         except:
             pass
     
+#пинг обычный и флудом
 def ping (message, ping_type, args):
     p_num = 10
     if ' ' in args: 
@@ -1137,6 +1174,7 @@ def ping (message, ping_type, args):
         bot.reply_to(message, "Неправильный ip.")
     return
 
+#получаем инфу от кастрюли по снмп
 def op_info(ip):
     result = []
     try:
@@ -1305,6 +1343,7 @@ def op_info(ip):
         error_capture(e=e)
     return result
 
+#ребутаем коммутаторы, определение модели коммутатора надо вынести отдельно, так как используется дальше в коде кучу раз
 def reboot(args, message):
     ip = check_IPV4(args)
     if ip:
@@ -1402,6 +1441,7 @@ def reboot(args, message):
     else:
         bot.reply_to(message, args + " не является ip адресом.")
 
+#получаем инфу по порту, возможно быстрее, лучше и проще делать это через снмп
 def port_info(args, message):
     def get_file(arg):
         s = start_session()
@@ -1459,6 +1499,7 @@ def port_info(args, message):
                             s.expect("[Pp]assword:")
                             s.sendline(sw_pass)
                             mode = 1
+                            print("ena")
                         if mode == 1:
                             s.sendline('show ver')
                             s.expect("#")
@@ -1504,6 +1545,39 @@ def port_info(args, message):
                                     for element in answer:
                                         result += element + '\n'   
                                     s.sendline('show mac ad int g0/2')
+                                    s.expect(hostname + '#')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
+                                    for element in answer:
+                                        result += element + '\n'
+                                    s.sendline('exit')
+                                    s.expect(hostname + '>')
+                                    s.sendline('exit')
+                                else:
+                                    s.sendline('exit')
+                                    s.expect(hostname + '>')
+                                    s.sendline('exit')
+                            elif (switch.find("Version 2.0.1N") != -1):
+                                if int(port) > 0 and int(port) <= 8:
+                                    s.sendline('show int f0/%s' % port)
+                                    s.expect(hostname + '#')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
+                                    for element in answer:
+                                        result += element + '\n'
+                                    s.sendline('show mac ad int f0/%s' % port)
+                                    s.expect(hostname + '#')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
+                                    for element in answer:
+                                        result += element + '\n'
+                                    s.sendline('exit')
+                                    s.expect(hostname + '>')
+                                    s.sendline('exit')
+                                elif int(port) == 9:
+                                    s.sendline('show int g1/1')
+                                    s.expect(hostname + '#')
+                                    answer = s.before.decode('utf-8', "ignore").split('\r\n')
+                                    for element in answer:
+                                        result += element + '\n'   
+                                    s.sendline('show mac ad int g1/1')
                                     s.expect(hostname + '#')
                                     answer = s.before.decode('utf-8', "ignore").split('\r\n')
                                     for element in answer:
@@ -1728,6 +1802,7 @@ def port_info(args, message):
         else:
             bot.reply_to(message, "Коммутатор " + ip + " недоступен или не существует.")
 
+#показываем ошибки на портах
 def show_errors(args, message):
     if args.find(' ') != -1:
         ip = args.split(' ')[0]
@@ -1775,6 +1850,7 @@ def show_errors(args, message):
         msg = "Коммутатор " + ip + " недоступен или не существует."
     bot.reply_to(message, msg)     
 
+#сбрасываем ошибки на портах
 def err_reset(args, message):
     def get_file(arg):
         s = start_session()
@@ -1965,7 +2041,7 @@ def err_reset(args, message):
         else:
             bot.reply_to(message, "Коммутатор " + ip + " недоступен или не существует.")
 
-
+#смотрим оптический сигнал, для бдкомов может очень редко иногда случаться факап с зависанием коммутатора намертво (или нет)
 def fiber(args, message): 
     if args.find(' ') != -1:
         ip = args.split(' ')[0]
@@ -2135,6 +2211,7 @@ def fiber(args, message):
         else:
             bot.reply_to(message, "Коммутатор " + ip + " недоступен или не существует.")
 
+#получаем аптайм через снмп
 def uptime(message, args):
     result = '?'
     ip = check_IPV4(args)
@@ -2160,6 +2237,7 @@ def uptime(message, args):
         msg = "Коммутатор " + ip + " недоступен или не существует."
     bot.reply_to(message, msg)        
 
+#отправляем в кастрюлю новые настройки
 def op_set(ip, cmd):
     result = []
     try:
@@ -2192,6 +2270,7 @@ def op_set(ip, cmd):
         error_capture(e = e)
         result = "pxssh failed on login"
 
+#настройка кастрюли
 def op_mgmt(args, message, mode, op_list):
     multi = False
     k = 0
@@ -2293,6 +2372,7 @@ def op_mgmt(args, message, mode, op_list):
             
     return multi, op_list, k
                 
+#тут есть косяк в определении дежурного в ЦУСе на стыке первого и последнего дня месяца, надо бы исправить
 def who(args, message):
     def month(x):
         return {
@@ -2345,7 +2425,6 @@ def who(args, message):
         h = int(datetime.now().time().hour)
         if args.lower() == "оэ":
             day = date.today().strftime("%d")
-            man = []
             msg = 'Дежурный ОЭ:\n'
             
             for i in range(6):
@@ -2353,18 +2432,17 @@ def who(args, message):
                 name = ws_oe.cell(i + 3, 2).value
                 
                 if cell is not None:
-                    if cell.lower() == 'а':
-                        if h >= 9 and h < 21:
-                            msg += 'с 9:00 до 21:00: ' + name + ' @' + oe_username(i) + '\n'
+                    if cell.lower() == '8':
+                        if h >= 9 and h < 18:
+                            msg += 'с 9:00 до 18:00: ' + name + ' @' + oe_username(i) + '\n'
                         else:
-                            msg += 'с 9:00 до 21:00: ' + name + ' ' + oe_username(i) + '\n'
+                            msg += 'с 9:00 до 18:00: ' + name + ' ' + oe_username(i) + '\n'
                         
-                    if cell.lower() == 'ад':
+                    if cell.lower() == 'а':
                         msg += 'с 00:00 до 23:59: ' + name + ' @' + oe_username(i) + '\n'
                 
         elif args.lower() == "ит":
             day = date.today().strftime("%d")
-            man = []
             msg = 'Дежурный ИТ:\n'
             
             for i in range(8):
@@ -2379,11 +2457,13 @@ def who(args, message):
                         msg += 'с 9:00 до 22:00: ' + name + ' ' + uname + '\n'
                     
         elif args.lower() == "цус":
+            _shift = False
+
             if h>0 and h<9:
                 day = str(int(date.today().strftime("%d")) - 1)
             else:
                 day = date.today().strftime("%d")
-            man = []
+
             msg = 'Дежурный ЦУС:\n'
             uname = ''
             
@@ -2395,23 +2475,31 @@ def who(args, message):
                 
                 if cell is not None:
                     if cell.lower() == 'д':
-                        if h >= 9 and h < 21:
+                        if h>=9 and h<21:
                             msg += 'с 9:00 до 21:00: ' + name + ' @' + uname + '\n'
-                        else:
+                        elif h>=21:
                             msg += 'с 9:00 до 21:00: ' + name + ' ' + uname + '\n'
+                        elif h>=0 and h<9:
+                            _shift = True
+
                     if cell.lower() == 'н':
                         if h >= 21 or h < 9:
-                            if h>=0 and h<8:
-                                if i==0:
-                                    uname = it_username(7)
-                                else:
-                                    uname = it_username(i)
-                                name = ws_it.cell(i + 2, 1).value
-                                msg += 'с 21:00 до 9:00: ' + name + ' @' + uname + '\n'
-                            else:
-                                msg += 'с 21:00 до 9:00: ' + name + ' @' + uname + '\n'
+                            msg += 'с 21:00 до 9:00: ' + name + ' @' + uname + '\n'
                         else:
                             msg += 'с 21:00 до 9:00: ' + name + ' ' + uname + '\n'
+
+            if _shift:
+                day = date.today().strftime("%d")
+
+                for i in range(8):
+                    cell = ws_it.cell(i + 2, 1 + int(day)).value
+                    name = ws_it.cell(i + 2, 1).value
+                    uname = it_username(i)
+                    
+                    if cell is not None:
+                        if cell.lower() == 'д':
+                            msg += 'с 9:00 до 21:00: ' + name + ' ' + uname + '\n'
+
         else:
             msg = 'ты'
         
@@ -2420,7 +2508,8 @@ def who(args, message):
     except Exception as e:
         print(e)
         bot.reply_to(message, 'Превышено количество запросов к Google API, попробуйте через минуту.')
-    
+
+#актуалочка
 def exp(message):
     etraxisdb = etraxisdb_connect()
     cur = etraxisdb.cursor(buffered=True)
@@ -2570,6 +2659,7 @@ def exp(message):
     
     bot.reply_to(message, msg, parse_mode='MarkdownV2') 
 
+#поиск района, сами районы захардкожены вручную в локальной базе
 def district_find(args):   
     res = []
     if args.find(', ') != -1:
@@ -2596,6 +2686,7 @@ def district_find(args):
                     res = row
     return res
 
+#нужно ли это отдельно?
 def district(args, message):
     res = ''
     row = district_find(args)
@@ -2605,6 +2696,7 @@ def district(args, message):
         res = 'Ничего не нашлось.'
     bot.reply_to(message, res)
 
+#берём большое сообщение, режем на части и отправляем частями, есть подводные, лень вникать
 def send_msg_with_split(message, msg, n):
     i = 0
     if len(msg) > n:
@@ -2627,6 +2719,7 @@ def send_msg_with_split(message, msg, n):
         if msg != '' and msg != '\n':
             bot.reply_to(message, msg)
 
+#обработка поиска графиков в заббиксе, один или много, криво-косо, чё-то захардкожено, чё-то на костылях, переписывать красиво влом
 def get_graph(args, message, mode, x_list):
     multi_h = False
     multi_g = False
@@ -2773,6 +2866,7 @@ def get_graph(args, message, mode, x_list):
         
     return multi_h, multi_g, x_list, k
 
+#помощь по командам, один хрен никто не читает и все косячат с запятой между названием улицы и номером здания
 def hlp(message):
     msg = """🔸 /help — выводит данное сообщение.
 🔸 кто оэ — выводит список дежурных ОЭ.
@@ -2802,6 +2896,7 @@ def hlp(message):
 статусы: 🟢 новая 🟡 в работе 🔵 ожидание компании 🔴 ожидание инженера 🟤 ожидание клиента"""
     bot.reply_to(message, msg)
 
+#нереализовано, можно выпилить
 def cacti(message, args, action):
     def search(args):
         s = start_cacti_session()
@@ -2852,6 +2947,7 @@ def cacti(message, args, action):
             if count == 1:
                 send_img(message, graphs[0])
 
+#шлём коммент из трекера
 def send_comment(args, message):
     msg = ''
     if args.isdigit():
@@ -2865,6 +2961,7 @@ def send_comment(args, message):
         
     send_msg_with_split(message, msg, 2000)
 
+#ищем комменты в трекерной записи, потенциально имбовая дыра в безопасности, имеем абсолютный полный доступ ко всем записям. Есть подводные
 def get_comments(args):
     etraxisdb = etraxisdb_connect()
     cur = etraxisdb.cursor(buffered=True)
@@ -2925,7 +3022,8 @@ def get_comments(args):
     etraxisdb.close()
     
     return comments
-          
+
+#статус питания коммутатора AC -- от розетки, DC -- от батарейки. Надо бы парсить выхлоп и писать, что этот от батареи, этот от розетки, а этот хз откуда -- не поддерживает
 def power(message, args):
     ip = check_IPV4(args)
     if ip:
@@ -3038,6 +3136,7 @@ def power(message, args):
         else:
             bot.reply_to(message, "Коммутатор " + ip + " недоступен или не существует.")
 
+#кабельтест на порту. При параде планет очередной бдком может впасть в безумие и зависнуть
 def cabletest(message, args):
     if args.find(' ') != -1:
         ip = args.split(' ')[0]
@@ -3310,6 +3409,7 @@ def cabletest(message, args):
         else:
             bot.reply_to(message, "Коммутатор " + ip + " недоступен или не существует.")
 
+#обработка документации по узлам (нереализовано)
 def odf(message, args, cmd):
     res = ''
     num = 0
@@ -3343,6 +3443,7 @@ def odf(message, args, cmd):
     
     return {'chat_id': chat_id, 'status': status, 'num': num}
 
+#обрабатываем тыканье в кнопочки настройки кастрюлей
 @bot.callback_query_handler(func=lambda c:True)
 def inline(c):
     _cmd = c.data.split(',')[0]
@@ -3639,13 +3740,16 @@ def inline(c):
         msg = 'Настройка *эквалайзера* на\:\n' + msg
     if msg != '':
         bot.reply_to(c.message, msg, parse_mode='MarkdownV2', reply_markup=key)
-          
+
+#добавляем обработку команд старт и хелп, нужно добавить команду send nudes
 @bot.message_handler(commands=['start', 'help'])
 def send_help(message):
     command = get_command(message.text).lower()
     if check_command_allow(message, command):
         hlp(message)
 
+#бот фактически читает вообще весь текст в группе и выбирает в нём то, что ему кажется командами, возможны недопонимания со стороны человеков
+#куча глобальных переменных, колхоз и костыли, надо переделать красиво, но когда?
 @bot.message_handler(content_types=['text'])
 def worker(message):
     global links
@@ -3696,7 +3800,7 @@ def worker(message):
             elif ((command == 'кто') and (args != "")):
                 who(args, message)
                 
-            #OP mgmt
+            #настройка кастрюлей
             elif ((command == 'оп') and (args != "")):
                 multi, op_list, _num = op_mgmt(args, message, 1, [])
                 _num -= 1
@@ -3746,7 +3850,8 @@ def worker(message):
             elif ((command == 'карта') and (args != "")):
                 send_map(message, args)
             
-            #ZABBIX GRAPHS 
+            #тут пытаемся через костыли с глобальными переменными построить диалог с человеками
+            #графики
             elif ((command == 'график') and (args != "")):
                 if args.lower() == "мо":
                     send_mo(message)
@@ -3775,7 +3880,7 @@ def worker(message):
             elif ((command == 'схема') and (args != "")):
                 get_scheme(args, message, 'scheme')
 
-            #WIKI SEARCH
+            #поиск по вики
             elif ((command == 'плд') and (args != "")):
                 msg, num, svars = search_pages(args)
                 if (num == 1):
@@ -3805,7 +3910,7 @@ def worker(message):
             elif ((command == 'дрс') and (args != "")):
                 get_scheme(args, message, 'drs')
 
-        # MULTIPLE ZABBIX GRAPHS 
+        #если у нас нашлось больше одного графика в заббиксе, то спросим какой нужен в итоге
         if (command.isdigit() and multiple_zabbix_graphs.get(chat_id) and (int(command)-1 <= zabbix_num.get(chat_id)) and (int(command) > 0)):
             multiple_zabbix_graphs = {chat_id: False}
             multi_h, multi_g, x_list, k = get_graph(command, message, 3, zabbix_graphs)
@@ -3815,7 +3920,7 @@ def worker(message):
             multiple_zabbix_host = {chat_id: multi_h}
             zabbix_hosts = {chat_id: x_list}
 
-        # MULTIPLE ZABBIX HOSTS       
+        #то же, но с хостами в заббиксе  
         elif (command.isdigit() and multiple_zabbix_host.get(chat_id) and (int(command)-1 <= zabbix_num.get(chat_id)) and (int(command) > 0)):
             multiple_zabbix_host = {chat_id: False}
             multi_h, multi_g, x_list, k = get_graph(command, message, 2, zabbix_hosts)
@@ -3825,7 +3930,7 @@ def worker(message):
             multiple_zabbix_host = {chat_id: multi_h}
             zabbix_hosts = {chat_id: x_list}
             
-        # MULTIPLE OP HOSTS  
+        #то же, но с кастрюлями 
         elif (command.isdigit() and multiple_op_host.get(chat_id) and (int(command)-1 <= zabbix_num.get(chat_id)) and (int(command) > 0)):
             multiple_op_host = {chat_id: False}
             _op_list = zabbix_hosts.get(chat_id)
@@ -3834,7 +3939,7 @@ def worker(message):
             #zabbix_num = {chat_id: i}
             zabbix_hosts = {chat_id: op_list}
         
-        # MULTIPLE ODF  
+        #выбор узлов связи, это нереализовано, можно выпилить
         elif (command.isdigit() and multiple_odf.get(chat_id) and (int(command)-1 <= zabbix_num.get(chat_id)) and (int(command) > 0)):
             multiple_op_host = {chat_id: False}
             _op_list = zabbix_hosts.get(chat_id)
@@ -3843,7 +3948,7 @@ def worker(message):
             #zabbix_num = {chat_id: i}
             zabbix_hosts = {chat_id: op_list}
 
-        # MULTIPLE WIKI SEARCH
+        #если нашлась куча страниц в вики, спрашиваем какая нужна
         elif (command.isdigit() and request.get(chat_id) and (int(command)-1 <= request_num.get(chat_id)) and (int(command)-1 >= 0)):
             request = {chat_id: False}
             request_drs = {chat_id: False}
@@ -3865,10 +3970,13 @@ def worker(message):
         error_capture(e=e, message=message)
         pass
 
+#бот перепроверяет исправленные сообщения на предмет скрытых посланий ему лично
 @bot.edited_message_handler(content_types=['text'])
 def edit_worker(message):
     worker(message)
 
+#вот это нерабочее говно, которое нельзя остановить по Ctrl+C, прибить бота получится только чем-то вроде:
+#ps aux | grep 'python3 ./dog_bot.py' | grep -v grep | awk '{print$2}' | xargs kill
 def main():
     while True:
         try:
@@ -3879,5 +3987,6 @@ def main():
         except:
             pass
 
+#запускаем наш колхоз с костылями
 if __name__ == '__main__':
     main()
