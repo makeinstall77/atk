@@ -2,7 +2,6 @@
 #бот разросся, нужно разнести функционал по файлам: ядро бота отдельно, комманды отдельно в виде плагинов
 #нужно переосмыслить диалог с пользователем, избавиться от глобальных переменных
 
-#слишком много импортируем, надо пересмотреть всё это и не импортировать лишнее
 import traceback
 import sys
 import requests
@@ -14,9 +13,7 @@ import re
 import mysql.connector
 import psycopg2
 import gspread
-import psycopg2
 
-#импортируем чуть меньше
 from configparser import ConfigParser
 from datetime import date, datetime, timezone
 from contextlib import closing
@@ -30,6 +27,19 @@ from pexpect import pxssh
 from bs4 import BeautifulSoup
 from pyzabbix import ZabbixAPI
 from telebot import types
+
+#мерзкие глобальные переменные
+request_num = {}
+request_str = {}
+request = {}
+multiple_zabbix_host = {}
+multiple_op_host = {}
+multiple_zabbix_graphs = {}
+zabbix_num = {}
+zabbix_hosts = {}
+zabbix_graphs = {}
+multiple_odf = {}
+multiple_odf_num = {}
 
 #грузим всё из конфига
 config = ConfigParser()
@@ -71,27 +81,6 @@ cacti_login = config.get('id', 'cacti_login')
 cacti_password = config.get('id', 'cacti_password')
 graph_port = config.get('id', 'graph_port')
 
-#включаем логи в файл и в stdout
-logging.basicConfig(filename=os.path.basename(sys.argv[0]) + '.log', \
-                                                level=logging.INFO)
-logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
-
-#запускаемся даже без заббикса и гуглодиска, но что будет, если не запустится сам бот?
-try:
-    bot = telebot.TeleBot(bot_id)
-    zapi = ZabbixAPI(zabbix_host)
-    zapi.login(zabbix_login, zabbix_password)
-    gc = gspread.service_account()
-    sh_oe = gc.open_by_url(google_oe)
-    sh_it = gc.open_by_url(google_it)
-except Exception as e:
-    print (e)
-    msg = traceback.format_exc()
-    print (msg)
-    sys.exit(0)
-    pass
-
-#догружаем из конфига
 url = {
     'root_url': config.get('url', 'root_url'),
     'ref_url_ref': config.get('url', 'ref_url_ref'),
@@ -149,18 +138,25 @@ pg_atk_bot_vars = {
     'database': config.get('pg_atk_bot', 'database')
 }
 
-#мерзкие глобальные переменные
-request_num = {}
-request_str = {}
-request = {}
-multiple_zabbix_host = {}
-multiple_op_host = {}
-multiple_zabbix_graphs = {}
-zabbix_num = {}
-zabbix_hosts = {}
-zabbix_graphs = {}
-multiple_odf = {}
-multiple_odf_num = {}
+#включаем логи в файл и в stdout
+logging.basicConfig(filename=os.path.basename(sys.argv[0]) + '.log', \
+                                                level=logging.INFO)
+logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
+
+#запускаемся даже без заббикса и гуглодиска, но что будет, если не запустится сам бот?
+try:
+    bot = telebot.TeleBot(bot_id)
+    zapi = ZabbixAPI(zabbix_host)
+    zapi.login(zabbix_login, zabbix_password)
+    gc = gspread.service_account()
+    sh_oe = gc.open_by_url(google_oe)
+    sh_it = gc.open_by_url(google_it)
+except Exception as e:
+    print (e)
+    msg = traceback.format_exc()
+    print (msg)
+    sys.exit(0)
+    pass
 
 #отлавливаем ошибки и постим в тележный канал под логи
 def error_capture(**kwargs):
@@ -169,7 +165,6 @@ def error_capture(**kwargs):
             'message' : None,}
 
     options.update(kwargs)
-
     e = options.get('e')
     message = options.get('message')
 
@@ -602,7 +597,7 @@ def get_scheme(args, message, stype):
     
     return result
 
-#инфа по зданию, тут возможно есть подводные
+#инфа по зданию
 def get_house_info(args, message):
     res = ''
     if match(args):
@@ -640,7 +635,6 @@ def get_house_info(args, message):
             else:
                 res = '?'
                 
-            
         else:
             if args.find(' ') != -1:
                 street = args.split(' ')[0]
@@ -690,7 +684,6 @@ def get_house_info(args, message):
         house = args.split(' ')[1]
         street = args.split(' ')[0]
 
-        
         if args.find(' ') != -1:
             _ids = search_ids(street + '%', house)
             if _ids:
@@ -898,7 +891,7 @@ def send_mo(message):
         #chrome_options.add_argument('--user-data-dir=~/.config/google-chrome')
         driver = webdriver.Remote(command_executor=selenium_server, \
                 options=chrome_options)
-        driver.set_window_size(1350, 1050)
+        driver.set_window_size(1400, 600)
         driver.get(selenium_root)
         driver.find_element(By.ID, "login").send_keys(selenium_username)
         driver.find_element(By.ID, "pwd").send_keys(selenium_password)
@@ -1413,7 +1406,6 @@ def reboot(args, message):
                             s.sendline('reload')
                             s.sendline('y')
                             result = ip + " SNR-S2965-8T ушёл в ребут"
-                    
                         elif (switch.find("Image text-base: 0x80010000") != -1):
                             s.sendline('reboot')
                             s.sendline('y')
@@ -1436,7 +1428,6 @@ def reboot(args, message):
         except Exception as e:
             error_capture(e = e)
             result = "pxssh failed on login"
-                
         bot.reply_to(message, result)
     else:
         bot.reply_to(message, args + " не является ip адресом.")
@@ -1474,10 +1465,8 @@ def port_info(args, message):
     ip = check_IPV4(ip)   
     if (ip and port.isdigit()):
         if check_comm_aviability(ip) > 0 :
-
             result = ''
             answer = ''
-            
             try:
                 s = pxssh.pxssh(timeout=90)
                 hostname = ping_hostname
@@ -1774,9 +1763,7 @@ def port_info(args, message):
             except Exception as e:
                 error_capture(e=e)
                 result = "pxssh failed on login"
-            
             msg = result
-            
             if (len(msg) > 4000):
                 msg = "message is too long!\n\n" + msg[:4000]
                 msg = '`' + re.escape(msg) + '`'
@@ -1845,7 +1832,6 @@ def show_errors(args, message):
             except Exception as e:
                 error_capture(e=e)
                 result = "pxssh failed on login"
-        
     else:
         msg = "Коммутатор " + ip + " недоступен или не существует."
     bot.reply_to(message, msg)     
@@ -1883,10 +1869,8 @@ def err_reset(args, message):
     ip = check_IPV4(ip)
     if (ip and port.isdigit()):
         if check_comm_aviability(ip) > 0 :
-
             result = 'Счётчики на порту успешно сброшены.'
             answer = ''
-            
             try:
                 s = pxssh.pxssh(timeout=90)
                 hostname = ping_hostname
@@ -2062,10 +2046,8 @@ def fiber(args, message):
     ip = check_IPV4(ip)
     if (ip and port.isdigit()):
         if check_comm_aviability(ip) > 0 :
-
             result = ''
             answer = ''
-            
             try:
                 s = pxssh.pxssh(timeout=90)
                 hostname = ping_hostname
@@ -2633,9 +2615,6 @@ def exp(message):
             else:
                 escaped = '\?' + escaped
         
-        
-        
-        
         msg += '[' + e + '](https://atk.is/tracker/records/view.php?id=' + str(elements[0])+ ')[🌐]' + '(https://m.atk.is/#breakdowns/' + str(elements[0]) + ') ' + escaped + '\n'
     
     cur.close()
@@ -2653,10 +2632,8 @@ def exp(message):
     
     if msg == '':
         msg = 'В базе пусто\!'
-    
     _msg = '🟢 новая 🟡 в работе 🔵 ожидание компании 🔴 ожидание инженера 🟤 ожидание клиента\nНажатие на круг - ссылка в трекер, нажатие на 🌐 - ссылка в ЛК, п - первак, в - вторяк, ч - чуркин, ? - не определено, 📞 - количество обращений, [+СВЛ+ВСО+ЭКС] - найдены подзаписи, [3] - уровень критичности, адрес'
     bot.reply_to(message, _msg)
-    
     bot.reply_to(message, msg, parse_mode='MarkdownV2') 
 
 #поиск района, сами районы захардкожены вручную в локальной базе
@@ -2696,7 +2673,7 @@ def district(args, message):
         res = 'Ничего не нашлось.'
     bot.reply_to(message, res)
 
-#берём большое сообщение, режем на части и отправляем частями, есть подводные, лень вникать
+#берём большое сообщение, режем на части и отправляем частями
 def send_msg_with_split(message, msg, n):
     i = 0
     if len(msg) > n:
@@ -2755,7 +2732,6 @@ def get_graph(args, message, mode, x_list):
         _search = find_switch_by_address(args)
         x_list = []
         _zhost = []
-        
         _fnd = False
         if _search:
             for streets in _search:
@@ -2799,10 +2775,16 @@ def get_graph(args, message, mode, x_list):
                                     _zhost.append(_t)
                                     _fnd = True
                                     
-                        h = zapi.host.get(search={'host': _sw}, output=['hostid', 'name'])
                         if h:
                             for _host in h:
                                 if 'ERD' in _host.get('name'):
+                                    _t = [_host, switches]
+                                    _zhost.append(_t)
+                                    _fnd = True
+                        
+                        if h:
+                            for _host in h:
+                                if 'UniPing' in _host.get('name'):
                                     _t = [_host, switches]
                                     _zhost.append(_t)
                                     _fnd = True
