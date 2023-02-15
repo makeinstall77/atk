@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-#бот разросся, нужно разнести функционал по файлам: ядро бота отдельно, комманды отдельно в виде плагинов
-#нужно переосмыслить диалог с пользователем, избавиться от глобальных переменных
 
 import traceback
 import sys
@@ -28,7 +26,6 @@ from bs4 import BeautifulSoup
 from pyzabbix import ZabbixAPI
 from telebot import types
 
-#мерзкие глобальные переменные
 request_num = {}
 request_str = {}
 request = {}
@@ -143,7 +140,6 @@ logging.basicConfig(filename=os.path.basename(sys.argv[0]) + '.log', \
                                                 level=logging.INFO)
 logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
 
-#запускаемся даже без заббикса и гуглодиска, но что будет, если не запустится сам бот?
 try:
     bot = telebot.TeleBot(bot_id)
     zapi = ZabbixAPI(zabbix_host)
@@ -153,7 +149,6 @@ except Exception as e:
     msg = traceback.format_exc()
     print (msg)
     sys.exit(0)
-    pass
 
 #отлавливаем ошибки и постим в тележный канал под логи
 def error_capture(**kwargs):
@@ -434,7 +429,7 @@ def check_comm_aviability(ip):
     netdb = netdb_connect()
     #Получаем id коммутатора
     comm_cur = netdb.cursor(buffered=True)
-    comm_cur.execute("select id from commutators where ip = '" + ip + "'")
+    comm_cur.execute("select id from commutators where ip = %s", (ip, ))
     comm_res = comm_cur.fetchall()
     comm_cur.close()
     netdb.close()
@@ -893,7 +888,6 @@ def send_mo(message):
         chrome_options.add_argument("--headless")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--no-sandbox")
-        #chrome_options.add_argument('--user-data-dir=~/.config/google-chrome')
         driver = webdriver.Remote(command_executor=selenium_server, \
                 options=chrome_options)
         driver.set_window_size(1400, 600)
@@ -917,7 +911,6 @@ def send_mo(message):
             file = open(save_dir + 'screenshot.png', 'rb')
             bot.send_photo(message.chat.id, file)
             file.close()
-        #driver.quit()
     except Exception as e:
         error_capture(e=e, message=message)
         try:
@@ -928,60 +921,35 @@ def send_mo(message):
         
 #график ИТ/ЦУС, разрешение экрана захардкожено!
 def send_it(message):
-    try:
-        chrome_options = Options()
-        chrome_options.add_argument("--headless")
-        chrome_options.add_argument("--disable-dev-shm-usage")
-        chrome_options.add_argument("--no-sandbox")
-        #chrome_options.add_argument('--user-data-dir=~/.config/google-chrome')
-        driver = webdriver.Remote(command_executor=selenium_server, \
-                options=chrome_options)
-        driver.set_window_size(1220, 500)
-        driver.get(google_it)
-        timeout = 60
-        try:
-            element_present = EC.presence_of_element_located((By.ID, \
-                    'goog-inline-block grid4-inner-container'))
-            WebDriverWait(driver, timeout).until(element_present)
-        except TimeoutException:
-            pass
-        finally:
-            time.sleep(2)
-            html_source = driver.page_source
-            driver.save_screenshot(save_dir + "screenshot.png")
-            driver.quit()  
-            file = open(save_dir + 'screenshot.png', 'rb')
-            bot.send_photo(message.chat.id, file)
-            file.close()
-    except Exception as e:
-        error_capture(e=e, message=message)
-        try:
-            driver.quit()
-            bot.reply_to(message, e)
-        except:
-            pass
+    send_work_graph("it", message)
 
 #график ОЭ, разрешение экрана захардкожено!
 def send_oe(message):
+    send_work_graph("oe", message)
+
+def send_work_graph(type, message):
     try:
         chrome_options = Options()
         chrome_options.add_argument("--headless")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--no-sandbox")
-        #chrome_options.add_argument('--user-data-dir=~/.config/google-chrome')
-        driver = webdriver.Remote(command_executor=selenium_server, \
-                options=chrome_options)
-        driver.set_window_size(1300, 980)
-        driver.get(selenium_oe)
+        driver = webdriver.Remote(command_executor=selenium_server, options=chrome_options)
+        
+        if type = "oe":
+            driver.set_window_size(1500, 1000)
+            driver.get(selenium_oe)
+        elif type = "it":
+            driver.set_window_size(1400, 500)
+            driver.get(google_it)
+
         timeout = 60
         try:
-            element_present = EC.presence_of_element_located((By.ID, \
-                    'goog-inline-block grid4-inner-container'))
+            element_present = EC.presence_of_element_located((By.ID, 'goog-inline-block grid4-inner-container'))
             WebDriverWait(driver, timeout).until(element_present)
         except TimeoutException:
             pass
         finally:
-            time.sleep(2)
+            time.sleep(1)
             html_source = driver.page_source
             driver.save_screenshot(save_dir + "screenshot.png")
             driver.quit()
@@ -1004,10 +972,8 @@ def send_map(message, text):
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--incognito")
-        #chrome_options.add_argument('--user-data-dir=~/.config/google-chrome')
         driver = webdriver.Remote(command_executor=selenium_server, options=chrome_options)
         driver.set_window_size(1200, 910)
-#        driver.set_window_size(480, 240)
         driver.get(selenium_root_cross)
         timeout = 3
         try:
@@ -1033,8 +999,7 @@ def send_map(message, text):
                 driver.get(selenium_cross_search)
                 timeout = 80
                 try:
-                    element_present = EC.presence_of_element_located((By.ID, \
-                            'searchtree_set_new_8_span'))
+                    element_present = EC.presence_of_element_located((By.ID, 'searchtree_set_new_8_span'))
                     WebDriverWait(driver, timeout).until(element_present)
                 except TimeoutException:
                     print("Timed out waiting for page to load")
@@ -1447,7 +1412,6 @@ def reboot(args, message):
     else:
         bot.reply_to(message, args + " не является ip адресом.")
 
-#получаем инфу по порту, возможно быстрее, лучше и проще делать это через снмп
 def port_info(args, message):
     def get_file(arg):
         s = start_session()
@@ -1806,6 +1770,8 @@ def port_info(args, message):
 
 #показываем ошибки на портах
 def show_errors(args, message):
+    msg = ""
+
     if args.find(' ') != -1:
         ip = args.split(' ')[0]
         port = args.split(' ')[1]
@@ -2040,7 +2006,7 @@ def err_reset(args, message):
         else:
             bot.reply_to(message, "Коммутатор " + ip + " недоступен или не существует.")
 
-#смотрим оптический сигнал, для бдкомов может очень редко иногда случаться факап с зависанием коммутатора намертво (или нет)
+#смотрим оптический сигнал
 def fiber(args, message): 
     if args.find(' ') != -1:
         ip = args.split(' ')[0]
@@ -2231,7 +2197,7 @@ def uptime(message, args):
                 result = "pxssh failed on login"
         msg = "Аптайм " + ip + ' равен: ' + result
     else:
-        msg = "Коммутатор " + ip + " недоступен или не существует."
+        msg = "Коммутатор " + args + " недоступен или не существует."
     bot.reply_to(message, msg)        
 
 #отправляем в кастрюлю новые настройки
@@ -2274,38 +2240,41 @@ def op_mgmt(args, message, mode, op_list):
     def op_request(message, _name, _hostid):
         _ip = zapi.hostinterface.get(filter={'hostid': _hostid}, output = ['ip'])[0].get('ip')
         _val = op_info(_ip)
-        if _val[5] == '72GE':
-            _payload = _ip + ',' + _name
-            if _val[6] == 'NaN':
-                _op_power = '\nOptical In: ' + _val[3] + ' dBm\n'
+        if _val:
+            if _val[5] == '72GE':
+                _payload = _ip + ',' + _name
+                if _val[6] == 'NaN':
+                    _op_power = '\nOptical In: ' + _val[3] + ' dBm\n'
+                else:
+                    _op_power = '\nOptical In1: ' + _val[3] + ' dBm\n' + 'Optical In2: ' + _val[6] + ' dBm\n'
+                msg = "➡️ " + _name + '\nIP: ' + _ip + _op_power + 'RF Out: ' + _val[4] + ' dBuV\nATT: ' + _val[0] + '\nEQ: ' + _val[1] + '\nАРУ (AGC): ' + _val[2] + ' dB\nTemp: ' + _val[7] + '°C\nUptime: ' + _val[8] + '\n\n'
+                bot.reply_to(message, msg)
+                key = types.InlineKeyboardMarkup()
+                but_1 = types.InlineKeyboardButton(text="Аттенюация", callback_data="OPA," + _payload)
+                but_2 = types.InlineKeyboardButton(text="Эквалайзер", callback_data="OPE," + _payload)
+                but_3 = types.InlineKeyboardButton(text="АРУ", callback_data="OPG," + _payload)
+                key.add(but_1, but_2, but_3)
+                bot.send_message(message.chat.id, "Настройка параметров", reply_markup=key)
+            elif (_val[0] == 'a'):
+                msg = "❌" + _name + '\nIP: ' + _ip + '\n\nОптический приёмник недоступен!\n\n'
+                bot.reply_to(message, msg)
             else:
-                _op_power = '\nOptical In1: ' + _val[3] + ' dBm\n' + 'Optical In2: ' + _val[6] + ' dBm\n'
-            msg = "➡️ " + _name + '\nIP: ' + _ip + _op_power + 'RF Out: ' + _val[4] + ' dBuV\nATT: ' + _val[0] + '\nEQ: ' + _val[1] + '\nАРУ (AGC): ' + _val[2] + ' dB\nTemp: ' + _val[7] + '°C\nUptime: ' + _val[8] + '\n\n'
-            bot.reply_to(message, msg)
-            key = types.InlineKeyboardMarkup()
-            but_1 = types.InlineKeyboardButton(text="Аттенюация", callback_data="OPA," + _payload)
-            but_2 = types.InlineKeyboardButton(text="Эквалайзер", callback_data="OPE," + _payload)
-            but_3 = types.InlineKeyboardButton(text="АРУ", callback_data="OPG," + _payload)
-            key.add(but_1, but_2, but_3)
-            bot.send_message(message.chat.id, "Настройка параметров", reply_markup=key)
-        elif (_val[0] == 'a'):
-            msg = "❌" + _name + '\nIP: ' + _ip + '\n\nОптический приёмник недоступен!\n\n'
-            bot.reply_to(message, msg)
+                _payload = _ip + ',' + _name
+                if _val[6] == 'NaN':
+                    _op_power = '\nOptical In: ' + _val[3] + ' dBm\n'
+                else:
+                    _op_power = '\nOptical In1: ' + _val[3] + ' dBm\n' + 'Optical In2: ' + _val[6] + ' dBm\n'
+                msg = "➡️ " + _name + '\nIP: ' + _ip + _op_power + 'RF Out: ' + _val[4] + ' dBuV\nATT: ' + _val[0] + '\nEQ: ' + _val[1] + '\nАРУ (AGC): ' + _val[2] + ' dB\nTemp: ' + _val[7] + '°C\nUptime: ' + _val[8] + '\n' + _val[9]+ 'V\n\n'
+                
+                bot.reply_to(message, msg)
+                key = types.InlineKeyboardMarkup()
+                but_1 = types.InlineKeyboardButton(text="Аттенюация", callback_data="OPA," + _payload)
+                but_2 = types.InlineKeyboardButton(text="Эквалайзер", callback_data="OPE," + _payload)
+                but_3 = types.InlineKeyboardButton(text="АРУ", callback_data="OPG," + _payload)
+                key.add(but_1, but_2, but_3)
+                bot.send_message(message.chat.id, "Настройка параметров", reply_markup=key)
         else:
-            _payload = _ip + ',' + _name
-            if _val[6] == 'NaN':
-                _op_power = '\nOptical In: ' + _val[3] + ' dBm\n'
-            else:
-                _op_power = '\nOptical In1: ' + _val[3] + ' dBm\n' + 'Optical In2: ' + _val[6] + ' dBm\n'
-            msg = "➡️ " + _name + '\nIP: ' + _ip + _op_power + 'RF Out: ' + _val[4] + ' dBuV\nATT: ' + _val[0] + '\nEQ: ' + _val[1] + '\nАРУ (AGC): ' + _val[2] + ' dB\nTemp: ' + _val[7] + '°C\nUptime: ' + _val[8] + '\n' + _val[9]+ 'V\n\n'
-            
-            bot.reply_to(message, msg)
-            key = types.InlineKeyboardMarkup()
-            but_1 = types.InlineKeyboardButton(text="Аттенюация", callback_data="OPA," + _payload)
-            but_2 = types.InlineKeyboardButton(text="Эквалайзер", callback_data="OPE," + _payload)
-            but_3 = types.InlineKeyboardButton(text="АРУ", callback_data="OPG," + _payload)
-            key.add(but_1, but_2, but_3)
-            bot.send_message(message.chat.id, "Настройка параметров", reply_markup=key)
+            bot.send_message(message.chat.id, "ОП недоступен")
             
     if mode == 1:
         _search = find_switch_by_address(args)
@@ -2722,7 +2691,7 @@ def send_msg_with_split(message, msg, n):
         if msg != '' and msg != '\n':
             bot.reply_to(message, msg)
 
-#обработка поиска графиков в заббиксе, один или много, криво-косо, чё-то захардкожено, чё-то на костылях, переписывать красиво влом
+#обработка поиска графиков в заббиксе
 def get_graph(args, message, mode, x_list):
     multi_h = False
     multi_g = False
@@ -2874,7 +2843,7 @@ def get_graph(args, message, mode, x_list):
         
     return multi_h, multi_g, x_list, k
 
-#помощь по командам, один хрен никто не читает и все косячат с запятой между названием улицы и номером здания
+#помощь по командам
 def hlp(message):
     msg = """🔸 /help — выводит данное сообщение.
 🔸 кто оэ — выводит список дежурных ОЭ.
@@ -2961,15 +2930,15 @@ def send_comment(args, message):
     if args.isdigit():
         comments = get_comments(args)
 
-    for comment in comments:
-        msg += comment + '\n'
+        for comment in comments:
+            msg += comment + '\n'
     
     if not msg:
         msg = 'пусто'
         
     send_msg_with_split(message, msg, 2000)
 
-#ищем комменты в трекерной записи, потенциально имбовая дыра в безопасности, имеем абсолютный полный доступ ко всем записям. Есть подводные
+#ищем комменты в трекерной записи
 def get_comments(args):
     etraxisdb = etraxisdb_connect()
     cur = etraxisdb.cursor(buffered=True)
@@ -3031,7 +3000,7 @@ def get_comments(args):
     
     return comments
 
-#статус питания коммутатора AC -- от розетки, DC -- от батарейки. Надо бы парсить выхлоп и писать, что этот от батареи, этот от розетки, а этот хз откуда -- не поддерживает
+#статус питания коммутатора AC -- от розетки, DC -- от батарейки
 def power(message, args):
     ip = check_IPV4(args)
     if ip:
@@ -3144,7 +3113,7 @@ def power(message, args):
         else:
             bot.reply_to(message, "Коммутатор " + ip + " недоступен или не существует.")
 
-#кабельтест на порту. При параде планет очередной бдком может впасть в безумие и зависнуть
+#кабельтест на порту
 def cabletest(message, args):
     if args.find(' ') != -1:
         ip = args.split(' ')[0]
@@ -3858,7 +3827,6 @@ def worker(message):
             elif ((command == 'карта') and (args != "")):
                 send_map(message, args)
             
-            #тут пытаемся через костыли с глобальными переменными построить диалог с человеками
             #графики
             elif ((command == 'график') and (args != "")):
                 if args.lower() == "мо":
@@ -3995,6 +3963,6 @@ def main():
         except:
             pass
 
-#запускаем наш колхоз с костылями
+#запускаем
 if __name__ == '__main__':
     main()
