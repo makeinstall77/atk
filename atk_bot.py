@@ -935,7 +935,7 @@ def send_work_graph(type, message):
         chrome_options.add_argument("--no-sandbox")
         driver = webdriver.Remote(command_executor=selenium_server, options=chrome_options)
         
-        if type = "oe":
+        if type == "oe":
             driver.set_window_size(1500, 1000)
             driver.get(selenium_oe)
         elif type = "it":
