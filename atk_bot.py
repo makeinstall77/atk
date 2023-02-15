@@ -938,7 +938,7 @@ def send_work_graph(type, message):
         if type == "oe":
             driver.set_window_size(1500, 1000)
             driver.get(selenium_oe)
-        elif type = "it":
+        elif type == "it":
             driver.set_window_size(1400, 500)
             driver.get(google_it)
 
