@@ -148,9 +148,6 @@ try:
     bot = telebot.TeleBot(bot_id)
     zapi = ZabbixAPI(zabbix_host)
     zapi.login(zabbix_login, zabbix_password)
-    gc = gspread.service_account()
-    sh_oe = gc.open_by_url(google_oe)
-    sh_it = gc.open_by_url(google_it)
 except Exception as e:
     print (e)
     msg = traceback.format_exc()
@@ -181,6 +178,12 @@ def error_capture(**kwargs):
             except:
                  pass
         logging.error(msg)
+try:
+    gc = gspread.service_account()
+    sh_oe = gc.open_by_url(google_oe)
+    sh_it = gc.open_by_url(google_it)
+except Exception as e:
+    error_capture(e=e)
 
 #каждую команду пишем в лог для истории запросов, включая неавторизованные
 def cmd_log(message, auth):
@@ -386,11 +389,13 @@ def switch_status(args, message):
 
 #подключаемся к локальной базе, нужна для определения привязки по районам
 def pg_connect():
-    pg = psycopg2.connect(
+#    pg = psycopg2.connect(
+    pg = mysql.connector.connect(
         host = pg_atk_bot_vars.get('host'),
         user = pg_atk_bot_vars.get('user'),
         password = pg_atk_bot_vars.get('password'),
-        dbname = pg_atk_bot_vars.get('database')
+#        dbname = pg_atk_bot_vars.get('database')
+	database = pg_atk_bot_vars.get('database')
         )
     return pg
 
@@ -979,7 +984,7 @@ def send_oe(message):
             time.sleep(2)
             html_source = driver.page_source
             driver.save_screenshot(save_dir + "screenshot.png")
-            driver.quit()  
+            driver.quit()
             file = open(save_dir + 'screenshot.png', 'rb')
             bot.send_photo(message.chat.id, file)
             file.close()
@@ -998,15 +1003,15 @@ def send_map(message, text):
         chrome_options.add_argument("--headless")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--incognito")
         #chrome_options.add_argument('--user-data-dir=~/.config/google-chrome')
-        driver = webdriver.Remote(command_executor=selenium_server, \
-                options=chrome_options)
+        driver = webdriver.Remote(command_executor=selenium_server, options=chrome_options)
         driver.set_window_size(1200, 910)
+#        driver.set_window_size(480, 240)
         driver.get(selenium_root_cross)
         timeout = 3
         try:
-            element_present = EC.presence_of_element_located((By.ID, \
-                    'loginform'))
+            element_present = EC.presence_of_element_located((By.ID, 'loginform'))
             WebDriverWait(driver, timeout).until(element_present)
         except TimeoutException:
             pass
@@ -1017,8 +1022,7 @@ def send_map(message, text):
             driver.find_element(By.NAME, "enter").click()
             timeout = 3
             try:
-                element_present = EC.presence_of_element_located((By.ID, \
-                        'loginform'))
+                element_present = EC.presence_of_element_located((By.ID, 'loginform'))
                 WebDriverWait(driver, timeout).until(element_present)
             except TimeoutException:
                 pass
@@ -1056,7 +1060,7 @@ def send_map(message, text):
                             error_capture(e=e, message=message)
                         finally:
                             try:
-                                time.sleep(5)
+                                time.sleep(3)
                                 element_present = EC.presence_of_element_located((By.XPATH, "//*[@class='ui-layout-toggler ui-layout-toggler-east ui-layout-toggler-open ui-layout-toggler-east-open']"))
                                 WebDriverWait(driver, timeout).until(element_present)
                                 driver.find_element(By.XPATH, "//*[@class='ui-layout-toggler ui-layout-toggler-east ui-layout-toggler-open ui-layout-toggler-east-open']").click()
@@ -1066,17 +1070,17 @@ def send_map(message, text):
                                 error_capture(e=e, message=message)
                             finally:
                                 try:
-                                    time.sleep(3)
+                                    time.sleep(2)
                                     element_present = EC.presence_of_element_located((By.NAME, 'templateId'))
                                     WebDriverWait(driver, timeout).until(element_present)
                                     driver.find_element(By.NAME, 'templateId').send_keys("Россия, Приморский край, Владивосток " + text)
                                     driver.find_element(By.ID, "SearchButton").click()
                                     try:
-                                        time.sleep(20)
+                                        time.sleep(15)
                                         element_present = EC.presence_of_element_located((By.XPATH, "//*[@class='firstAddress']"))
                                         WebDriverWait(driver, timeout).until(element_present)
                                         driver.find_element(By.XPATH, "//*[@class='firstAddress']").click()
-                                        time.sleep(30)
+                                        time.sleep(20)
                                     except TimeoutException:
                                         pass
                                     except Exception as e:
@@ -1101,7 +1105,7 @@ def send_map(message, text):
                                         pass
                                     except Exception as e:
                                         error_capture(e=e, message=message)
-                                    time.sleep(3)
+                                    time.sleep(2)
                                     driver.save_screenshot(save_dir + "screenshot.png")
                                     file = open(save_dir + "screenshot.png", 'rb')
                                     bot.send_photo(message.chat.id, file)
@@ -1321,7 +1325,18 @@ def op_info(ip):
                 s.sendline('sudo snmpwalk -v2c -c public %s DISMAN-EVENT-MIB::sysUpTimeInstance' % ip)
                 s.expect(ssh_prompt)
                 _uptime = s.before.decode('utf-8', "ignore").split('\r\n')[-1].split(') ')[-1]
-                
+
+                #вольтаж
+                _avg_voltage = 9999
+                for i in range(20):
+                    s.sendline('sudo snmpwalk -v2c -c public %s .1.3.6.1.4.1.17409.1.10.19.1.2.1 | awk \'{print$4}\'' % ip)
+                    s.expect(ssh_prompt)
+                    _voltage = s.before.decode('utf-8', "ignore").split('\r\n')[-1]
+                    if int(_avg_voltage) > int(_voltage):
+                        _avg_voltage = int(_voltage)
+
+                _avg_voltage = _avg_voltage/10
+
             result.append(att)
             result.append(eq)
             result.append(g)
@@ -1331,7 +1346,7 @@ def op_info(ip):
             result.append(op2)
             result.append(temp)
             result.append(_uptime)
-        
+            result.append(str(_avg_voltage))
     except Exception as e:
         error_capture(e=e)
     return result
@@ -1591,7 +1606,7 @@ def port_info(args, message):
                                     for element in answer:
                                         result += element + '\n'     
                                     s.sendline('exit')
-                            elif (switch.find("Series Software, Version 2.1.1A Build 16162, RELEASE SOFTWARE") != -1):
+                            elif (switch.find("Series Software, Version 2.1.1A Build") != -1):
                                 if int(port) > 0 and int(port) <= 48:
                                     s.sendline('show int g0/%s' % port)
                                     s.expect(hostname + '#')
@@ -1929,7 +1944,7 @@ def err_reset(args, message):
                                     s.sendline('clear counters interface e1/%s' % port)
                                     s.expect(hostname + '#')
                                     s.sendline('exit')
-                            elif (switch.find("Series Software, Version 2.1.1A Build 16162, RELEASE SOFTWARE") != -1):
+                            elif (switch.find("Series Software, Version 2.1.1A Build") != -1):
                                 if int(port) > 0 and int(port) <= 48:
                                     s.sendline('clear mib interface g0/%s' % port)
                                     s.expect(hostname + '#')
@@ -2089,7 +2104,7 @@ def fiber(args, message):
                                 s.sendline('exit')
                                 port_info(args, message)
                                 result = None
-                            elif (switch.find("Series Software, Version 2.1.1A Build 16162, RELEASE SOFTWARE") != -1):
+                            elif (switch.find("Series Software, Version 2.1.1A Build") != -1):
                                 s.sendline('config')
                                 s.expect(hostname + '_config#')
                                 s.sendline('ddm enable')
@@ -2282,7 +2297,7 @@ def op_mgmt(args, message, mode, op_list):
                 _op_power = '\nOptical In: ' + _val[3] + ' dBm\n'
             else:
                 _op_power = '\nOptical In1: ' + _val[3] + ' dBm\n' + 'Optical In2: ' + _val[6] + ' dBm\n'
-            msg = "➡️ " + _name + '\nIP: ' + _ip + _op_power + 'RF Out: ' + _val[4] + ' dBuV\nATT: ' + _val[0] + '\nEQ: ' + _val[1] + '\nАРУ (AGC): ' + _val[2] + ' dB\nTemp: ' + _val[7] + '°C\nUptime: ' + _val[8] + '\n\n'
+            msg = "➡️ " + _name + '\nIP: ' + _ip + _op_power + 'RF Out: ' + _val[4] + ' dBuV\nATT: ' + _val[0] + '\nEQ: ' + _val[1] + '\nАРУ (AGC): ' + _val[2] + ' dB\nTemp: ' + _val[7] + '°C\nUptime: ' + _val[8] + '\n' + _val[9]+ 'V\n\n'
             
             bot.reply_to(message, msg)
             key = types.InlineKeyboardMarkup()
@@ -2371,62 +2386,66 @@ def who(args, message):
             11: "Ноябрь",
             12: "Декабрь",
         }.get(x, "Январь")
-    
+
+    init = False
     name_sheet = month(int(date.today().strftime("%m"))) + ' ' + date.today().strftime("%Y")
 
     try:
         ws_it = sh_it.worksheet(name_sheet)
         ws_oe = sh_oe.worksheet(name_sheet)
-    except:
-        pass
-    
-    def oe_username(x):
-        return {
-            0: contacts.get('oe1'),
-            1: contacts.get('oe2'),
-            2: contacts.get('oe3'),
-            3: contacts.get('oe4'),
-            4: contacts.get('oe5'),
-            5: contacts.get('oe6'),
-        }[x]
-        
-    def it_username(x):
-        return {
-            0: contacts.get('it1'),
-            1: contacts.get('it2'),
-            2: contacts.get('it3'),
-            3: contacts.get('it4'),
-            4: contacts.get('it5'),
-            5: contacts.get('it6'),
-            6: contacts.get('it7'),
-            7: contacts.get('it8'),
-        }[x]
-    
-    try:
+        init = True
+    except Exception as e:
+        error_capture(e=e, message=message)
+
+    if init:
+
+        def oe_username(x):
+            return {
+                0: contacts.get('oe1'),
+                1: contacts.get('oe2'),
+                2: contacts.get('oe3'),
+                3: contacts.get('oe4'),
+                4: contacts.get('oe5'),
+                5: contacts.get('oe6'),
+            }[x]
+
+        def it_username(x):
+            return {
+                0: contacts.get('it1'),
+                1: contacts.get('it2'),
+                2: contacts.get('it3'),
+                3: contacts.get('it4'),
+                4: contacts.get('it5'),
+                5: contacts.get('it6'),
+                6: contacts.get('it7'),
+                7: contacts.get('it8'),
+            }[x]
+
         msg = ''
         h = int(datetime.now().time().hour)
+
         if args.lower() == "оэ":
             day = date.today().strftime("%d")
             msg = 'Дежурный ОЭ:\n'
-            
+
             for i in range(6):
                 cell = ws_oe.cell(i + 3, 2 + int(day)).value
                 name = ws_oe.cell(i + 3, 2).value
-                
+
                 if cell is not None:
                     if cell.lower() == '8':
                         if h >= 9 and h < 18:
                             msg += 'с 9:00 до 18:00: ' + name + ' @' + oe_username(i) + '\n'
                         else:
                             msg += 'с 9:00 до 18:00: ' + name + ' ' + oe_username(i) + '\n'
-                        
+
                     if cell.lower() == 'а':
                         msg += 'с 00:00 до 23:59: ' + name + ' @' + oe_username(i) + '\n'
-                
+
         elif args.lower() == "ит":
             day = date.today().strftime("%d")
             msg = 'Дежурный ИТ:\n'
-            
+
             for i in range(8):
                 cell = ws_it.cell(i + 2, 1 + int(day)).value
                 name = ws_it.cell(i + 2, 1).value
@@ -2437,7 +2456,7 @@ def who(args, message):
                         msg += 'с 9:00 до 22:00: ' + name + ' @' + uname + '\n'
                     else:
                         msg += 'с 9:00 до 22:00: ' + name + ' ' + uname + '\n'
-                    
+
         elif args.lower() == "цус":
             _shift = False
 
@@ -2448,13 +2467,12 @@ def who(args, message):
 
             msg = 'Дежурный ЦУС:\n'
             uname = ''
-            
+
             for i in range(8):
                 cell = ws_it.cell(i + 2, 1 + int(day)).value
                 name = ws_it.cell(i + 2, 1).value
                 uname = it_username(i)
-                
-                
+
                 if cell is not None:
                     if cell.lower() == 'д':
                         if h>=9 and h<21:
@@ -2477,19 +2495,19 @@ def who(args, message):
                     cell = ws_it.cell(i + 2, 1 + int(day)).value
                     name = ws_it.cell(i + 2, 1).value
                     uname = it_username(i)
-                    
+
                     if cell is not None:
                         if cell.lower() == 'д':
                             msg += 'с 9:00 до 21:00: ' + name + ' ' + uname + '\n'
 
         else:
             msg = 'ты'
-        
+
         if msg != 'ты':
             bot.reply_to(message, msg)
-    except Exception as e:
-        print(e)
-        bot.reply_to(message, 'Превышено количество запросов к Google API, попробуйте через минуту.')
+    else:
+        msg = 'Ошибка в инициализации Google API'
+        bot.reply_to(message, msg)
 
 #актуалочка
 def exp(message):
@@ -2637,30 +2655,38 @@ def exp(message):
     bot.reply_to(message, msg, parse_mode='MarkdownV2') 
 
 #поиск района, сами районы захардкожены вручную в локальной базе
-def district_find(args):   
+def district_find(args):
     res = []
     if args.find(', ') != -1:
         s = args.split(', ')[0]
         h = args.split(', ')[1]
-        with closing(pg_connect()) as conn:
-            with conn.cursor() as cursor:
-                cursor.execute("""SELECT name, house, district, street_id 
+#        with closing(pg_connect()) as conn:
+#            with conn.cursor() as cursor:
+        conn = pg_connect()
+        cursor = conn.cursor()
+        cursor.execute("""SELECT name, house, district, street_id 
                         FROM districts 
                         WHERE upper(name) like upper(%s) 
                         and upper(house) like upper(%s)""", (s + '%', h))
-                for row in cursor:
-                    res = row
+        for row in cursor:
+            res = row
+        cursor.close()
+        conn.close()
     elif args.find(' ') != -1:
         s = args.split(' ')[0]
         h = args.split(' ')[1]
-        with closing(pg_connect()) as conn:
-            with conn.cursor() as cursor:
-                cursor.execute("""SELECT name, house, district, street_id 
+#        with closing(pg_connect()) as conn:
+#            with conn.cursor() as cursor:
+        conn = pg_connect()
+        cursor = conn.cursor()
+        cursor.execute("""SELECT name, house, district, street_id 
                         FROM districts 
                         WHERE upper(name) like upper(%s) 
                         and upper(house) like upper(%s)""", (s + '%', h))
-                for row in cursor:
-                    res = row
+        for row in cursor:
+            res = row
+        cursor.close()
+        conn.close()
     return res
 
 #нужно ли это отдельно?
@@ -3490,7 +3516,7 @@ def inline(c):
             but_15 = types.InlineKeyboardButton(text="A14", callback_data="EA14," + _payback)
             but_16 = types.InlineKeyboardButton(text="A15", callback_data="EA15," + _payback)
             key.add(but_A, but_E, but_G, but_1, but_2, but_3, but_4, but_5, but_6, but_7, but_8, but_9, but_10, but_11, but_12, but_13, but_14, but_15, but_16)
-        msg = "➡️ " + _name + '\nIP: ' + _ip + _op_power + 'RF Out: ' + _val[4] + ' dBuV\nATT: ' + _val[0] + '\nEQ: ' + _val[1] + '\nАРУ (AGC): ' + _val[2] + ' dB\nTemp: ' + _val[7] + '°C\nUptime: ' + _val[8] + '\n\n'
+        msg = "➡️ " + _name + '\nIP: ' + _ip + _op_power + 'RF Out: ' + _val[4] + ' dBuV\nATT: ' + _val[0] + '\nEQ: ' + _val[1] + '\nАРУ (AGC): ' + _val[2] + ' dB\nTemp: ' + _val[7] + '°C\nUptime: ' + _val[8] +'\n' + _val[9]+ 'V\n\n'
         msg = re.escape(msg)
         msg = 'Настройка *аттенюации* на\:\n' + msg
     if _cmd == 'OPE':
@@ -3522,7 +3548,7 @@ def inline(c):
         but_15 = types.InlineKeyboardButton(text="E14", callback_data="EE14," + _payback)
         but_16 = types.InlineKeyboardButton(text="E15", callback_data="EE15," + _payback)
         key.add(but_A, but_E, but_G, but_1, but_2, but_3, but_4, but_5, but_6, but_7, but_8, but_9, but_10, but_11, but_12, but_13, but_14, but_15, but_16)
-        msg = "➡️ " + _name + '\nIP: ' + _ip + _op_power + 'RF Out: ' + _val[4] + ' dBuV\nATT: ' + _val[0] + '\nEQ: ' + _val[1] + '\nАРУ (AGC): ' + _val[2] + ' dB\nTemp: ' + _val[7] + '°C\nUptime: ' + _val[8] + '\n\n'
+        msg = "➡️ " + _name + '\nIP: ' + _ip + _op_power + 'RF Out: ' + _val[4] + ' dBuV\nATT: ' + _val[0] + '\nEQ: ' + _val[1] + '\nАРУ (AGC): ' + _val[2] + ' dB\nTemp: ' + _val[7] + '°C\nUptime: ' + _val[8] + '\n' + _val[9]+ 'V\n\n'
         msg = re.escape(msg)
         msg = 'Настройка *эквалайзера* на\:\n' + msg
     if _cmd == 'OPG':
@@ -3570,7 +3596,7 @@ def inline(c):
             but_2 = types.InlineKeyboardButton(text="-8", callback_data="EG-8," + _payback)
             but_3 = types.InlineKeyboardButton(text="-9", callback_data="EG-9," + _payback)
             key.add(but_A, but_E, but_G, but_1, but_2, but_3)
-        msg = "➡️ " + _name + '\nIP: ' + _ip + _op_power + 'RF Out: ' + _val[4] + ' dBuV\nATT: ' + _val[0] + '\nEQ: ' + _val[1] + '\nАРУ (AGC): ' + _val[2] + ' dB\nTemp: ' + _val[7] + '°C\nUptime: ' + _val[8] + '\n\n'
+        msg = "➡️ " + _name + '\nIP: ' + _ip + _op_power + 'RF Out: ' + _val[4] + ' dBuV\nATT: ' + _val[0] + '\nEQ: ' + _val[1] + '\nАРУ (AGC): ' + _val[2] + ' dB\nTemp: ' + _val[7] + '°C\nUptime: ' + _val[8] + '\n' + _val[9]+ 'V\n\n'
         msg = re.escape(msg)
         msg = 'Настройка *автоматической регулировки усиления* \(AGC\) на\:\n' + msg
     if _cmd[:2] == 'EA':
@@ -3632,7 +3658,7 @@ def inline(c):
             but_15 = types.InlineKeyboardButton(text="A14", callback_data="EA14," + _payback)
             but_16 = types.InlineKeyboardButton(text="A15", callback_data="EA15," + _payback)
             key.add(but_A, but_E, but_G, but_1, but_2, but_3, but_4, but_5, but_6, but_7, but_8, but_9, but_10, but_11, but_12, but_13, but_14, but_15, but_16)
-        msg = "➡️ " + _name + '\nIP: ' + _ip + _op_power + 'RF Out: ' + _val[4] + ' dBuV\nATT: ' + _val[0] + '\nEQ: ' + _val[1] + '\nАРУ (AGC): ' + _val[2] + ' dB\nTemp: ' + _val[7] + '°C\nUptime: ' + _val[8] + '\n\n'
+        msg = "➡️ " + _name + '\nIP: ' + _ip + _op_power + 'RF Out: ' + _val[4] + ' dBuV\nATT: ' + _val[0] + '\nEQ: ' + _val[1] + '\nАРУ (AGC): ' + _val[2] + ' dB\nTemp: ' + _val[7] + '°C\nUptime: ' + _val[8] + '\n' + _val[9]+ 'V\n\n'
         msg = re.escape(msg)
         msg = 'Настройка *аттенюации* на\:\n' + msg
     if _cmd[:2] == 'EG':
@@ -3682,7 +3708,7 @@ def inline(c):
             but_2 = types.InlineKeyboardButton(text="-8", callback_data="EG-8," + _payback)
             but_3 = types.InlineKeyboardButton(text="-9", callback_data="EG-9," + _payback)
             key.add(but_A, but_E, but_G, but_1, but_2, but_3)
-        msg = "➡️ " + _name + '\nIP: ' + _ip + _op_power + 'RF Out: ' + _val[4] + ' dBuV\nATT: ' + _val[0] + '\nEQ: ' + _val[1] + '\nАРУ (AGC): ' + _val[2] + ' dB\nTemp: ' + _val[7] + '°C\nUptime: ' + _val[8] + '\n\n'
+        msg = "➡️ " + _name + '\nIP: ' + _ip + _op_power + 'RF Out: ' + _val[4] + ' dBuV\nATT: ' + _val[0] + '\nEQ: ' + _val[1] + '\nАРУ (AGC): ' + _val[2] + ' dB\nTemp: ' + _val[7] + '°C\nUptime: ' + _val[8] + '\n' + _val[9]+ 'V\n\n'
         msg = re.escape(msg)
         msg = 'Настройка *автоматической регулировки усиления* \(AGC\) на\:\n' + msg
         
@@ -3717,7 +3743,7 @@ def inline(c):
         but_15 = types.InlineKeyboardButton(text="E14", callback_data="EE14," + _payback)
         but_16 = types.InlineKeyboardButton(text="E15", callback_data="EE15," + _payback)
         key.add(but_A, but_E, but_G, but_1, but_2, but_3, but_4, but_5, but_6, but_7, but_8, but_9, but_10, but_11, but_12, but_13, but_14, but_15, but_16)
-        msg = "➡️ " + _name + '\nIP: ' + _ip + _op_power + 'RF Out: ' + _val[4] + ' dBuV\nATT: ' + _val[0] + '\nEQ: ' + _val[1] + '\nАРУ (AGC): ' + _val[2] + ' dB\nTemp: ' + _val[7] + '°C\nUptime: ' + _val[8] + '\n\n'
+        msg = "➡️ " + _name + '\nIP: ' + _ip + _op_power + 'RF Out: ' + _val[4] + ' dBuV\nATT: ' + _val[0] + '\nEQ: ' + _val[1] + '\nАРУ (AGC): ' + _val[2] + ' dB\nTemp: ' + _val[7] + '°C\nUptime: ' + _val[8] + '\n' + _val[9]+ 'V\n\n'
         msg = re.escape(msg)
         msg = 'Настройка *эквалайзера* на\:\n' + msg
     if msg != '':
