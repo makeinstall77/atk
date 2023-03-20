@@ -224,15 +224,13 @@ def search_ids(street, house):
     if house == '%':
         _sql = """select b.id from buildings b 
                 join streets s on s.id = b.street_id 
-                where s.name like %s
-                and s.city = 'Владивосток';"""
+                where s.name like %s;"""
         cur.execute(_sql, (street, ))
     else:
         _sql = """select b.id from buildings b 
                     join streets s on s.id = b.street_id 
                     where s.name like %s 
-                    and b.number like %s
-                    and s.city = 'Владивосток';"""
+                    and b.number like %s;"""
         cur.execute(_sql, (street, house))
     result = cur.fetchall()
     cur.close()
@@ -299,8 +297,10 @@ def find_switch_by_address(args):
     def search_vars(street_id):
         netdb = netdb_connect()
         cur = netdb.cursor(buffered=True)
-        _sql = ("""select name, status, address, comments, ip 
-                    from commutators where building_id = %s""")
+        _sql = ("""select  c.name, c.status, c.address, c.comments, c.ip, str.city from commutators as c
+                    join net.buildings as b on (c.building_id = b.id)
+                    join net.streets as str on (str.id = b.street_id)
+                    where c.building_id = %s""")
         cur.execute(_sql, (street_id,))
         result = cur.fetchall()
         cur.close()
